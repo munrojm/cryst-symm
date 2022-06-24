@@ -1,29 +1,54 @@
+use nalgebra::{try_invert_to, Matrix3, Vector3};
 use std::collections::HashMap;
-use std::fmt;
+use std::f32::consts::PI;
 use std::string::String;
 
+#[derive(Debug)]
 pub struct Structure {
-    pub lattice: Vec<Vec<f32>>,
+    pub lattice: Matrix3<f32>,
+    pub reciprocal_lattice: Matrix3<f32>,
     pub species: Vec<String>,
-    pub coords: Vec<Vec<f32>>,
+    pub coords: Vec<Vector3<f32>>,
+    pub frac_coords: Vec<Vector3<f32>>,
     pub formula: String,
     pub reduced_formula: String,
 }
 
 impl Structure {
-    pub fn new(lattice: Vec<Vec<f32>>, species: Vec<String>, coords: Vec<Vec<f32>>) -> Self {
+    pub fn new(
+        lattice: Matrix3<f32>,
+        species: Vec<String>,
+        coords: Vec<Vector3<f32>>,
+    ) -> Structure {
         let (formula, reduced_formula) = Structure::get_formulas(species.clone());
-
+        let reciprocal_lattice = Structure::get_reciprocal_lattice(lattice.clone());
+        let frac_coords = Structure::get_frac_coords(lattice.clone(), coords.clone());
         Self {
             lattice: lattice,
+            reciprocal_lattice: reciprocal_lattice,
             species: species,
             coords: coords,
+            frac_coords: frac_coords,
             formula: formula,
             reduced_formula: reduced_formula,
         }
     }
 
-    fn species_coords_map(&self) -> HashMap<&String, &Vec<f32>> {
+    fn get_frac_coords(lattice: Matrix3<f32>, mut coords: Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
+        let mut inverted_lattice = Matrix3::identity();
+        let inverted = try_invert_to(lattice, &mut inverted_lattice);
+
+        if !inverted {
+            panic!("Crystal lattice is not invertible!");
+        }
+
+        for coord in coords.iter_mut() {
+            *coord = inverted_lattice * *coord;
+        }
+        return coords;
+    }
+
+    fn _species_coords_map(&self) -> HashMap<&String, &Vector3<f32>> {
         let mut map = HashMap::new();
 
         for pair in self.species.iter().zip(&self.coords) {
@@ -31,6 +56,17 @@ impl Structure {
         }
 
         return map;
+    }
+
+    fn get_reciprocal_lattice(lattice: Matrix3<f32>) -> Matrix3<f32> {
+        let mut reciprocal_lattice = Matrix3::identity();
+        let inverted = try_invert_to(lattice, &mut reciprocal_lattice);
+
+        if !inverted {
+            panic!("Crystal lattice is not invertible!");
+        }
+
+        return reciprocal_lattice.transpose() * 2.0 * PI;
     }
 
     fn get_formulas(species: Vec<String>) -> (String, String) {
@@ -75,26 +111,27 @@ impl Structure {
     }
 }
 
-impl fmt::Display for Structure {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "
-Structure {:?} ({:?})
+// impl fmt::Display for Structure {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         write!(
+//             f,
+//             "
+// Structure {:?} ({:?})
 
-Lattice:
-{:?},
-{:?},
-{:?}
+// Lattice:
+// {:?}
+// {:?}
+// {:?}
 
-Sites
-{:?}",
-            self.formula,
-            self.reduced_formula,
-            self.lattice[0],
-            self.lattice[1],
-            self.lattice[2],
-            self.species_coords_map()
-        )
-    }
-}
+// Sites:
+// {:?}
+// ",
+//             self.formula,
+//             self.reduced_formula,
+//             self.lattice[0],
+//             self.lattice[1],
+//             self.lattice[2],
+//             self.species_coords_map().iter()
+//         )
+//     }
+// }
