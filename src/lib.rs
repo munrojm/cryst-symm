@@ -1,2 +1,2 @@
+pub mod reduce;
 pub mod structure;
-pub use structure::*;

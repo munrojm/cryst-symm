@@ -1,4 +1,4 @@
-use crystsymm::Structure;
+use crystsymm::structure::Structure;
 use nalgebra::{Matrix3, Vector3};
 
 fn main() {
@@ -17,6 +17,14 @@ fn main() {
         Vector3::new(0.0, -0.1732, 4.5307),
     ];
 
-    let s = Structure::new(lattice, species, coords);
-    println!["{:#?}", s];
+    let mut s = Structure::new(lattice, species, coords);
+    println!["{:#?}", s.frac_coords];
+
+    s.set_origin(Vector3::new(0.5, 0.0, 0.5));
+    println!["{:#?}", s.frac_coords];
+
+    s.normalize_coords();
+    println!["{:#?}", s.frac_coords];
+
+    println!["{:?}", ((6.2 % 1.0) + 1.0) % 1.0]
 }
