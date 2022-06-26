@@ -115,10 +115,11 @@ impl Reducer {
         let first = cart_translation_vecs[0];
         let mut second = cart_translation_vecs[1];
         let mut third = cart_translation_vecs[2];
-        let cross_vec = first.cross(&second);
+        let mut cross_vec: Vector3<f32> = Vector3::new(0.0, 0.0, 0.0);
         let mut second_ind = 1;
 
         for (vec_num, vec) in cart_translation_vecs[1..].iter().enumerate() {
+            cross_vec = first.cross(vec);
             if cross_vec.magnitude().abs() <= self.dtol {
                 second = vec.clone();
                 second_ind = vec_num;
