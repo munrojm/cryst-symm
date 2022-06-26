@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::string::String;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 ///Representation of a periodic unit cell of a crystal structure.
 pub struct Structure {
     pub lattice: Matrix3<f32>,
@@ -44,21 +44,32 @@ impl Structure {
     ///     Vector3::new(0.0, -0.1732, 4.5307),
     /// ];
     ///
-    /// let s = Structure::new(lattice, species, coords);
+    /// let s = Structure::new(lattice, species, coords, true);
     /// ```
     pub fn new(
         lattice: Matrix3<f32>,
         species: Vec<String>,
         coords: Vec<Vector3<f32>>,
+        coords_are_cart: bool,
     ) -> Structure {
-        let (formula, reduced_formula) = Structure::get_formulas(species.clone());
-        let reciprocal_lattice = Structure::get_reciprocal_lattice(lattice.clone());
-        let frac_coords = Structure::get_frac_coords(lattice.clone(), coords.clone());
+        let (formula, reduced_formula) = Structure::get_formulas(&species);
+        let reciprocal_lattice = Structure::get_reciprocal_lattice(&lattice);
+        let frac_coords: Vec<Vector3<f32>>;
+        let cart_coords: Vec<Vector3<f32>>;
+
+        if coords_are_cart {
+            frac_coords = Structure::get_frac_coords(&lattice, &coords);
+            cart_coords = coords;
+        } else {
+            cart_coords = Structure::get_cart_coords(&lattice, &coords);
+            frac_coords = coords;
+        }
+
         Self {
             lattice: lattice,
             reciprocal_lattice: reciprocal_lattice,
             species: species,
-            coords: coords,
+            coords: cart_coords,
             frac_coords: frac_coords,
             formula: formula,
             reduced_formula: reduced_formula,
@@ -69,56 +80,64 @@ impl Structure {
         for vec in self.frac_coords.iter_mut() {
             *vec -= fractional_vector;
         }
-
-        self.normalize_coords()
     }
 
-    pub fn normalize_coords(&mut self) {
+    pub fn normalize_coords(&mut self, pos_tol: f32) {
+        let frac_tols = Vector3::from_iterator(
+            self.lattice
+                .column_iter()
+                .map(|col| pos_tol / col.magnitude()),
+        );
+
         for vec in self.frac_coords.iter_mut() {
-            for ind in vec {
-                *ind = ((*ind % 1.0) + 1.0) % 1.0;
+            for i in 0..3 {
+                let temp_coord = vec[i] % 1.0;
+                if temp_coord <= 0.0 - frac_tols[i] {
+                    vec[i] = temp_coord + 1.0;
+                } else if temp_coord >= 1.0 - frac_tols[i] {
+                    vec[i] = temp_coord - 1.0;
+                };
             }
         }
 
-        let new_cart_coords = Self::get_cart_coords(self.lattice, self.coords.clone());
+        let new_cart_coords = Self::get_cart_coords(&self.lattice, &self.frac_coords);
 
         self.coords = new_cart_coords;
     }
 
-    fn get_cart_coords(lattice: Matrix3<f32>, mut coords: Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
-        for coord in coords.iter_mut() {
-            *coord = lattice * *coord;
+    pub fn get_cart_coords(
+        lattice: &Matrix3<f32>,
+        coords: &Vec<Vector3<f32>>,
+    ) -> Vec<Vector3<f32>> {
+        let mut new_coords = coords.clone();
+
+        for (i, coord) in coords.iter().enumerate() {
+            new_coords[i] = lattice * coord;
         }
-        return coords;
+        return new_coords;
     }
 
-    fn get_frac_coords(lattice: Matrix3<f32>, mut coords: Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
+    pub fn get_frac_coords(
+        lattice: &Matrix3<f32>,
+        coords: &Vec<Vector3<f32>>,
+    ) -> Vec<Vector3<f32>> {
         let mut inverted_lattice = Matrix3::identity();
-        let inverted = try_invert_to(lattice, &mut inverted_lattice);
+        let mut new_coords = coords.clone();
+        let inverted = try_invert_to(lattice.clone(), &mut inverted_lattice);
 
         if !inverted {
             panic!("Crystal lattice is not invertible!");
         }
 
-        for coord in coords.iter_mut() {
-            *coord = inverted_lattice * *coord;
+        for (i, coord) in coords.iter().enumerate() {
+            new_coords[i] = inverted_lattice * coord;
         }
-        return coords;
+        return new_coords;
     }
 
-    fn _species_coords_map(&self) -> HashMap<&String, &Vector3<f32>> {
-        let mut map = HashMap::new();
-
-        for pair in self.species.iter().zip(&self.coords) {
-            map.insert(pair.0, pair.1);
-        }
-
-        return map;
-    }
-
-    fn get_reciprocal_lattice(lattice: Matrix3<f32>) -> Matrix3<f32> {
+    fn get_reciprocal_lattice(lattice: &Matrix3<f32>) -> Matrix3<f32> {
         let mut reciprocal_lattice = Matrix3::identity();
-        let inverted = try_invert_to(lattice, &mut reciprocal_lattice);
+        let inverted = try_invert_to(lattice.clone(), &mut reciprocal_lattice);
 
         if !inverted {
             panic!("Crystal lattice is not invertible!");
@@ -127,7 +146,7 @@ impl Structure {
         return reciprocal_lattice.transpose() * 2.0 * PI;
     }
 
-    fn get_formulas(species: Vec<String>) -> (String, String) {
+    fn get_formulas(species: &Vec<String>) -> (String, String) {
         let mut species_tally = HashMap::<&String, i8>::new();
 
         let mut max_count = 0;
@@ -168,28 +187,3 @@ impl Structure {
         return (formula, reduced_formula);
     }
 }
-
-// impl fmt::Display for Structure {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(
-//             f,
-//             "
-// Structure {:?} ({:?})
-
-// Lattice:
-// {:?}
-// {:?}
-// {:?}
-
-// Sites:
-// {:?}
-// ",
-//             self.formula,
-//             self.reduced_formula,
-//             self.lattice[0],
-//             self.lattice[1],
-//             self.lattice[2],
-//             self.species_coords_map().iter()
-//         )
-//     }
-// }
