@@ -33,13 +33,13 @@ fn main() {
 
     let reducer = Reducer { dtol: 0.1 };
 
-    let new_s = &reducer.find_primitive_cell(&s);
+    let new_s = reducer.find_primitive_cell(&s);
 
     println!["{:#?}", new_s];
 
-    let reducer = Reducer { dtol: 0.1 };
+    //let reducer = Reducer { dtol: 0.1 };
 
-    let (d_s, r) = reducer.delaunay_reduce(&new_s);
+    let d_s = reducer.delaunay_reduce(&new_s);
 
     println!["{:#?}", d_s];
 }

@@ -3,7 +3,7 @@ use nalgebra::{Matrix3, Matrix3x4, Vector3, Vector6};
 use std::collections::HashMap;
 use std::string::String;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Reducer {
     pub dtol: f32,
 }
