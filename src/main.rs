@@ -39,7 +39,7 @@ fn main() {
 
     //let reducer = Reducer { dtol: 0.1 };
 
-    let d_s = reducer.delaunay_reduce(&new_s);
+    let (d_s, dot_vec) = reducer.delaunay_reduce(&new_s);
 
-    println!["{:#?}", d_s];
+    println!["{:#?}", (d_s, dot_vec)];
 }

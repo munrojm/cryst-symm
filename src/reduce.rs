@@ -171,7 +171,7 @@ impl Reducer {
         return prim_structure;
     }
 
-    pub fn delaunay_reduce(self, structure: &Structure) -> Structure {
+    pub fn delaunay_reduce(self, structure: &Structure) -> (Structure, Vector6<f32>) {
         let mut new_structure = structure.clone();
         let pair_map: HashMap<usize, (u8, u8)> = HashMap::from([
             (0, (0, 1)),
@@ -232,7 +232,7 @@ impl Reducer {
         new_structure = Structure::new(new_lattice, new_structure.species, new_frac_coords, false);
         new_structure.normalize_coords(self.dtol);
 
-        return new_structure;
+        return (new_structure, scalar_prods);
     }
 
     fn get_scalar_prods(delauny_mat: &Matrix3x4<f32>) -> Vector6<f32> {
