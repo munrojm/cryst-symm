@@ -3,8 +3,13 @@ name = "crystsymm"
 version = "0.1.0"
 edition = "2018"
 
+[lib]
+name = "crystsymm"
+crate-type = ["cdylib"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 nalgebra = "0.31.0"
 lazy_static = "1.4.0"
+pyo3 = { version = "0.16.5", features = ["extension-module"] }
