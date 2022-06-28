@@ -110,35 +110,51 @@ impl Reducer {
         let mut cart_translation_vecs: Vec<Vector3<f32>> =
             Structure::get_cart_coords(&temp_structure.lattice, &translation_vecs);
 
-        cart_translation_vecs.sort_by(|a, b| a.magnitude().partial_cmp(&b.magnitude()).unwrap());
+        let frac_translation_vecs = self.get_shortest_translation_vecs(&mut cart_translation_vecs);
 
-        let first = cart_translation_vecs[0];
-        let mut second = cart_translation_vecs[1];
-        let mut third = cart_translation_vecs[2];
-        let mut cross_vec: Vector3<f32> = Vector3::new(0.0, 0.0, 0.0);
-        let mut second_ind = 1;
-
-        for (vec_num, vec) in cart_translation_vecs[1..].iter().enumerate() {
-            cross_vec = first.cross(vec);
-            if cross_vec.magnitude().abs() <= self.dtol {
-                second = vec.clone();
-                second_ind = vec_num;
-                break;
-            }
-        }
-
-        for vec in cart_translation_vecs[(second_ind + 1)..].iter() {
-            if !((cross_vec.dot(vec)).abs() <= self.dtol) {
-                third = vec.clone();
-                break;
-            }
-        }
         //
-        // 5.) Create a new structure object with new lattice and coords.
+        // 5.) Add combinations of shortest vectors
+        //
+
+        let smallest_frac_vecs =
+            Structure::get_frac_coords(&temp_structure.lattice, &frac_translation_vecs);
+
+        let frac_matrix = Matrix3::from_columns(&smallest_frac_vecs);
+
+        let base_comb_vecs: Vec<Vector3<f32>> = vec![
+            Vector3::new(1.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+            Vector3::new(0.0, 0.0, 1.0),
+            Vector3::new(1.0, 1.0, 0.0),
+            Vector3::new(1.0, 0.0, 1.0),
+            Vector3::new(0.0, 1.0, 1.0),
+        ];
+
+        let mut combination_vecs: Vec<Vector3<f32>> = Vec::new();
+
+        for comb_vec in base_comb_vecs {
+            let transformed_vec = frac_matrix * comb_vec;
+            combination_vecs.push(transformed_vec);
+            combination_vecs.push(-1.0 * transformed_vec);
+
+            for i in 0..3 {
+                let mut new_vec = transformed_vec.clone();
+                new_vec[i] = -1.0 * new_vec[i];
+                combination_vecs.push(new_vec);
+            }
+        }
+
+        let mut cart_translation_vecs: Vec<Vector3<f32>> =
+            Structure::get_cart_coords(&temp_structure.lattice, &combination_vecs);
+
+        let final_cart_vecs = self.get_shortest_translation_vecs(&mut cart_translation_vecs);
+
+        //
+        // 6.) Create a new structure object with new lattice and coords.
         //     TODO: Average positions which fold into one another in the new cell.
         //
 
-        let new_lattice = Matrix3::from_columns(&[first, second, third]);
+        let new_lattice = Matrix3::from_columns(&final_cart_vecs);
 
         let temp_frac_coords = Structure::get_frac_coords(&new_lattice, &temp_structure.coords);
 
@@ -225,6 +241,35 @@ impl Reducer {
         new_structure.normalize_coords(self.dtol);
 
         return new_structure;
+    }
+
+    fn get_shortest_translation_vecs(self, cart_vecs: &mut Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
+        cart_vecs.sort_by(|a, b| a.magnitude().partial_cmp(&b.magnitude()).unwrap());
+
+        let first = cart_vecs[0];
+        let mut cross_vec: Vector3<f32> = Vector3::new(0.0, 0.0, 0.0);
+        let mut second_ind = 1;
+        let mut third_ind = 2;
+
+        for (vec_num, cart_vec) in cart_vecs[1..].iter().enumerate() {
+            cross_vec = first.cross(cart_vec);
+
+            if cross_vec.magnitude().abs() > self.dtol {
+                second_ind = vec_num + 1;
+                break;
+            }
+        }
+
+        for (vec_num, cart_vec) in cart_vecs[(second_ind + 1)..].iter().enumerate() {
+            if !((cross_vec.dot(cart_vec)).abs() <= self.dtol) {
+                third_ind = vec_num + second_ind + 1;
+                break;
+            }
+        }
+
+        let final_vecs = vec![cart_vecs[0], cart_vecs[second_ind], cart_vecs[third_ind]];
+
+        return final_vecs;
     }
 
     pub fn get_scalar_prods(delaunay_mat: &Matrix3x4<f32>) -> Vector6<f32> {
