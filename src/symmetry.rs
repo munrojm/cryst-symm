@@ -40,7 +40,6 @@ impl SymmetryAnalyzer {
         for mat in trans_mats.iter() {
             let selling_vec = Reducer::get_scalar_prods(&(delaunay_mat * mat));
             let simplified_selling = self.get_simplified_selling(&selling_vec);
-            println!("{:?}", (selling_vec, simplified_selling));
             lookup_data = SELLING_TO_BRAVAIS.get(&simplified_selling);
             match lookup_data {
                 Some(_) => break,
