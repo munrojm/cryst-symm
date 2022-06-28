@@ -171,7 +171,7 @@ impl Reducer {
         return prim_structure;
     }
 
-    pub fn delaunay_reduce(self, structure: &Structure) -> (Structure, Vector6<f32>) {
+    pub fn delaunay_reduce(self, structure: &Structure) -> Structure {
         let mut new_structure = structure.clone();
         let pair_map: HashMap<usize, (u8, u8)> = HashMap::from([
             (0, (0, 1)),
@@ -184,6 +184,62 @@ impl Reducer {
 
         let lattice = structure.lattice.clone();
 
+        let mut delaunay_mat = Self::compute_delaunay_mat(&lattice);
+
+        let mut scalar_prods = Self::get_scalar_prods(&delaunay_mat);
+
+        let mut count = 0;
+
+        while scalar_prods.iter().any(|val| val > &0.0001) && count <= 100 {
+            let mut pos_pair = &(0, 0);
+
+            for (i, entry) in scalar_prods.iter().enumerate() {
+                if entry > &0.0001 {
+                    pos_pair = pair_map.get(&i).unwrap();
+                }
+            }
+
+            for i in 0..4 {
+                if !(pos_pair.0 == i || pos_pair.1 == i) {
+                    let new_col = &delaunay_mat.column(pos_pair.0 as usize)
+                        + &delaunay_mat.column(i as usize);
+                    delaunay_mat.set_column(i as usize, &new_col);
+                };
+            }
+
+            let neg_column = &delaunay_mat.column(pos_pair.0 as usize) * (-1.0);
+
+            delaunay_mat.set_column(pos_pair.0 as usize, &neg_column);
+            scalar_prods = Self::get_scalar_prods(&delaunay_mat);
+            count += 1;
+        }
+
+        if count == 100 {
+            panic!("Reached max number of iterations without reduction!")
+        }
+
+        let new_lattice = Matrix3::from(delaunay_mat.fixed_columns::<3>(0));
+        let new_frac_coords = Structure::get_frac_coords(&new_lattice, &new_structure.coords);
+
+        new_structure = Structure::new(new_lattice, new_structure.species, new_frac_coords, false);
+        new_structure.normalize_coords(self.dtol);
+
+        return new_structure;
+    }
+
+    pub fn get_scalar_prods(delaunay_mat: &Matrix3x4<f32>) -> Vector6<f32> {
+        let mut scalar_prods: Vector6<f32> = Vector6::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+        let mut ind = 0;
+        for i in 0..3 {
+            for j in (i + 1)..4 {
+                scalar_prods[ind] = delaunay_mat.column(i).dot(&delaunay_mat.column(j));
+                ind += 1;
+            }
+        }
+        return scalar_prods;
+    }
+
+    pub fn compute_delaunay_mat(lattice: &Matrix3<f32>) -> Matrix3x4<f32> {
         let d4 = -1.0 * (&lattice.column(0) + &lattice.column(1) + &lattice.column(2));
 
         let cols: Vec<Vector3<f32>> = lattice
@@ -192,59 +248,9 @@ impl Reducer {
             .chain([d4])
             .collect();
 
-        let mut delauny_mat = Matrix3x4::from_columns(&cols);
+        let delaunay_mat = Matrix3x4::from_columns(&cols);
 
-        let mut scalar_prods = Self::get_scalar_prods(&delauny_mat);
-
-        let mut count = 0;
-
-        while scalar_prods.iter().any(|val| val > &0.001) && count <= 100 {
-            let mut pos_pair = &(0, 0);
-
-            for (i, entry) in scalar_prods.iter().enumerate() {
-                if entry > &0.001 {
-                    pos_pair = pair_map.get(&i).unwrap();
-                }
-            }
-
-            for i in 0..4 {
-                if !(pos_pair.0 == i || pos_pair.1 == i) {
-                    let new_col =
-                        &delauny_mat.column(pos_pair.0 as usize) + &delauny_mat.column(i as usize);
-                    delauny_mat.set_column(i as usize, &new_col);
-                };
-            }
-
-            let neg_column = &delauny_mat.column(pos_pair.0 as usize) * (-1.0);
-
-            delauny_mat.set_column(pos_pair.0 as usize, &neg_column);
-            scalar_prods = Self::get_scalar_prods(&delauny_mat);
-            count += 1;
-        }
-
-        if count == 100 {
-            panic!("Reached max number of iterations without reduction!")
-        }
-
-        let new_lattice = Matrix3::from(delauny_mat.fixed_columns::<3>(0));
-        let new_frac_coords = Structure::get_frac_coords(&new_lattice, &new_structure.coords);
-
-        new_structure = Structure::new(new_lattice, new_structure.species, new_frac_coords, false);
-        new_structure.normalize_coords(self.dtol);
-
-        return (new_structure, scalar_prods);
-    }
-
-    fn get_scalar_prods(delauny_mat: &Matrix3x4<f32>) -> Vector6<f32> {
-        let mut scalar_prods: Vector6<f32> = Vector6::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-        let mut ind = 0;
-        for i in 0..3 {
-            for j in (i + 1)..4 {
-                scalar_prods[ind] = delauny_mat.column(i).dot(&delauny_mat.column(j));
-                ind += 1;
-            }
-        }
-        return scalar_prods;
+        return delaunay_mat;
     }
 
     fn normalize_frac_vector(vec: &mut Vector3<f32>, frac_tols: &Vector3<f32>) {
