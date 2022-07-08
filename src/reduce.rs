@@ -9,7 +9,7 @@ pub struct Reducer {
 }
 
 impl Reducer {
-    pub fn find_primitive_cell(self, structure: &Structure) -> Structure {
+    pub fn find_primitive_cell(&self, structure: &Structure) -> Structure {
         let mut temp_structure = structure.clone();
         let frac_tols = Vector3::from_iterator(
             temp_structure
@@ -187,7 +187,7 @@ impl Reducer {
         return prim_structure;
     }
 
-    pub fn delaunay_reduce(self, structure: &Structure) -> Structure {
+    pub fn delaunay_reduce(&self, structure: &Structure) -> Structure {
         let mut new_structure = structure.clone();
         let pair_map: HashMap<usize, (u8, u8)> = HashMap::from([
             (0, (0, 1)),
@@ -198,9 +198,7 @@ impl Reducer {
             (5, (2, 3)),
         ]);
 
-        let lattice = structure.lattice.clone();
-
-        let mut delaunay_mat = Self::compute_delaunay_mat(&lattice);
+        let mut delaunay_mat = structure.compute_delaunay_mat();
 
         let mut scalar_prods = Self::get_scalar_prods(&delaunay_mat);
 
@@ -243,7 +241,10 @@ impl Reducer {
         return new_structure;
     }
 
-    fn get_shortest_translation_vecs(self, cart_vecs: &mut Vec<Vector3<f32>>) -> Vec<Vector3<f32>> {
+    fn get_shortest_translation_vecs(
+        &self,
+        cart_vecs: &mut Vec<Vector3<f32>>,
+    ) -> Vec<Vector3<f32>> {
         cart_vecs.sort_by(|a, b| a.magnitude().partial_cmp(&b.magnitude()).unwrap());
 
         let first = cart_vecs[0];
@@ -282,20 +283,6 @@ impl Reducer {
             }
         }
         return scalar_prods;
-    }
-
-    pub fn compute_delaunay_mat(lattice: &Matrix3<f32>) -> Matrix3x4<f32> {
-        let d4 = -1.0 * (&lattice.column(0) + &lattice.column(1) + &lattice.column(2));
-
-        let cols: Vec<Vector3<f32>> = lattice
-            .column_iter()
-            .map(|vec| Vector3::new(vec[0], vec[1], vec[2]))
-            .chain([d4])
-            .collect();
-
-        let delaunay_mat = Matrix3x4::from_columns(&cols);
-
-        return delaunay_mat;
     }
 
     fn normalize_frac_vector(vec: &mut Vector3<f32>, frac_tols: &Vector3<f32>) {

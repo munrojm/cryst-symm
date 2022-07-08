@@ -1,4 +1,4 @@
-use nalgebra::{try_invert_to, Matrix3, Vector3};
+use nalgebra::{try_invert_to, Matrix3, Matrix3x4, Vector3};
 use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::string::String;
@@ -74,6 +74,30 @@ impl Structure {
             formula: formula,
             reduced_formula: reduced_formula,
         }
+    }
+
+    pub fn apply_transformation(&mut self, trans_mat: &Matrix3<isize>) {
+        // Transforms as lattice * T = lattice'
+        // Fix to add new sites
+        let float_mat: Matrix3<f32> = Matrix3::from_iterator(trans_mat.iter().map(|&x| x as f32));
+        self.lattice = self.lattice * float_mat;
+        self.frac_coords = Self::get_frac_coords(&self.lattice, &self.coords);
+        self.coords = Self::get_cart_coords(&self.lattice, &self.frac_coords);
+    }
+
+    pub fn compute_delaunay_mat(&self) -> Matrix3x4<f32> {
+        let d4 = -1.0 * (self.lattice.column(0) + self.lattice.column(1) + self.lattice.column(2));
+
+        let cols: Vec<Vector3<f32>> = self
+            .lattice
+            .column_iter()
+            .map(|vec| Vector3::new(vec[0], vec[1], vec[2]))
+            .chain([d4])
+            .collect();
+
+        let delaunay_mat = Matrix3x4::from_columns(&cols);
+
+        return delaunay_mat;
     }
 
     pub fn set_origin(&mut self, fractional_vector: Vector3<f32>) {

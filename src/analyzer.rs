@@ -1,8 +1,8 @@
-use crate::data::SELLING_TO_BRAVAIS;
+use crate::data::{SELLING_TO_BRAVAIS, SELLING_TO_CONV_TRANS, ZERO_TOL};
 use crate::reduce::Reducer;
 use crate::structure::Structure;
 use itertools::Itertools;
-use nalgebra::{Matrix3, Matrix4, Vector4, Vector6};
+use nalgebra::{Matrix3, Matrix3x4, Matrix4, Vector4, Vector6};
 use std::collections::HashMap;
 use std::option::Option;
 use std::string::String;
@@ -13,23 +13,43 @@ pub struct SymmetryAnalyzer {
 }
 
 impl SymmetryAnalyzer {
-    pub fn get_bravais(self, structure: &Structure) -> Option<&String> {
+    pub fn get_conventional_structure(&self, structure: &Structure) -> Option<Structure> {
         let reducer = Reducer { dtol: self.dtol };
 
         let prim_structure = reducer.find_primitive_cell(structure);
         let del_prim_structure = reducer.delaunay_reduce(&prim_structure);
 
+        let mut delaunay_mat = del_prim_structure.compute_delaunay_mat();
+
+        let _ = self.delaunay_to_bravais(&mut delaunay_mat);
+
+        let selling_vec = Reducer::get_scalar_prods(&delaunay_mat);
+
+        let simplified_selling = self.get_simplified_selling(&selling_vec);
+
+        let trans_mat = SELLING_TO_CONV_TRANS.get(&simplified_selling);
+
+        let mut new_structure = structure.clone();
+
+        let new_latt: Matrix3<f32> = Matrix3::from(delaunay_mat.fixed_slice::<3, 3>(0, 0));
+        let mat: Matrix3<f32> =
+            Matrix3::from_iterator(trans_mat.unwrap().iter().map(|&x| x as f32));
+
+        match trans_mat {
+            Some(mat) => new_structure.apply_transformation(&mat.transpose()),
+            None => return Option::None,
+        }
+
+        return Option::Some(new_structure);
+    }
+
+    fn delaunay_to_bravais(&self, delaunay_mat: &mut Matrix3x4<f32>) -> Option<&String> {
         let trans_mats = self.generate_delaunay_permutation_mats();
-
-        let delaunay_mat = Reducer::compute_delaunay_mat(&del_prim_structure.lattice);
-
         let mut bravais: Option<&String> = Option::None;
-
-        let mut new_delanay = delaunay_mat.clone();
-
+        let original_delaunay = delaunay_mat.clone();
         for mat in trans_mats.iter() {
-            new_delanay = delaunay_mat * mat;
-            let selling_vec = Reducer::get_scalar_prods(&new_delanay);
+            *delaunay_mat = original_delaunay * mat;
+            let selling_vec = Reducer::get_scalar_prods(&delaunay_mat);
             let simplified_selling = self.get_simplified_selling(&selling_vec);
             bravais = SELLING_TO_BRAVAIS.get(&simplified_selling);
             match bravais {
@@ -37,19 +57,16 @@ impl SymmetryAnalyzer {
                 None => (),
             }
         }
-
-        let new_lattice: Matrix3<f32> = Matrix3::from(new_delanay.fixed_slice::<3, 3>(0, 0));
-
         return bravais;
     }
 
-    fn get_simplified_selling(self, &selling_vec: &Vector6<f32>) -> Vector6<usize> {
+    fn get_simplified_selling(&self, &selling_vec: &Vector6<f32>) -> Vector6<usize> {
         let mut value_map: HashMap<usize, usize> = HashMap::from([(0, 0)]);
         let mut count = 1;
         let mut simplified_selling = Vector6::new(0, 0, 0, 0, 0, 0);
         for (i, j) in selling_vec.iter().enumerate() {
-            let mut rounded_val = (j.abs() * 100.0) as usize; // Will need to match with tolerance here later.
-            if j.abs() <= self.dtol {
+            let mut rounded_val = (j.abs() * 100.0) as usize; // May need to match with tolerance here later.
+            if j.abs() <= ZERO_TOL {
                 rounded_val = 0
             }
             let new_val: usize;
@@ -66,7 +83,7 @@ impl SymmetryAnalyzer {
         return simplified_selling;
     }
 
-    fn generate_delaunay_permutation_mats(self) -> Vec<Matrix4<f32>> {
+    fn generate_delaunay_permutation_mats(&self) -> Vec<Matrix4<f32>> {
         let base_vecs: Vec<Vector4<f32>> = vec![
             Vector4::new(1.0, 0.0, 0.0, 0.0),
             Vector4::new(0.0, 1.0, 0.0, 0.0),
@@ -78,7 +95,9 @@ impl SymmetryAnalyzer {
 
         for vec in base_vecs.into_iter().permutations(4) {
             let mat = Matrix4::from_columns(&vec[..]);
+            //if mat[15] == 1.0 {
             mats.push(mat);
+            //}
         }
 
         return mats;

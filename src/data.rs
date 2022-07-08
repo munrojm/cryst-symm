@@ -3,6 +3,8 @@ use nalgebra::{Matrix3, Vector6};
 use std::collections::HashMap;
 use std::string::String;
 
+pub static ZERO_TOL: f32 = 1e-6;
+
 lazy_static! {
     pub static ref SELLING_TO_BRAVAIS: HashMap<Vector6<usize>, String> = {
         HashMap::from([
@@ -40,68 +42,135 @@ lazy_static! {
             (Vector6::new(0, 1, 2, 3, 4, 0), String::from("aP")),
         ])
     };
-    pub static ref BRAVAIS_TO_TRANS: HashMap<String, Matrix3<isize>> = HashMap::from([
-        (String::from("cI"), Matrix3::new(0, 1, 1, 1, 0, 1, 1, 1, 0),),
-        (String::from("cF"), Matrix3::new(1, -1, 1, 1, 1, 1, 0, 0, 2),),
-        (String::from("cP"), Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1),),
-        (String::from("cP"), Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1),),
-        (String::from("hP"), Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1),),
-        (
-            String::from("hR"),
-            Matrix3::new(1, 0, 1, -1, 1, 1, 0, -1, 1),
-        ),
-        (String::from("hR"), Matrix3::new(1, 0, 1, 0, 0, 3, 0, 1, 2),),
-        (String::from("tI"), Matrix3::new(0, 1, 1, 1, 0, 1, 1, 1, 0),),
-        (String::from("tI"), Matrix3::new(1, 0, 1, 0, 1, 1, 0, 0, 2),),
-        (String::from("tP"), Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1),),
-        (String::from("tP"), Matrix3::new(1, 0, 0, 0, 0, 1, 0, 1, 1),),
-        (String::from("tP"), Matrix3::new(0, 0, 1, 1, 1, 0, 0, 1, 0),),
-        (String::from("oF"), Matrix3::new(1, -1, 1, 1, 1, 1, 0, 0, 2),),
-        (String::from("oI"), Matrix3::new(0, 1, 1, 1, 0, 1, 1, 1, 0),),
-        (String::from("oI"), Matrix3::new(1, 0, 1, 0, 1, 1, 0, 0, 2),),
-        (String::from("oI"), Matrix3::new(0, 1, 1, 1, 0, 1, 1, 1, 0),),
-        (String::from("oI"), Matrix3::new(1, 0, 1, 0, 1, 1, 0, 0, 2),),
-        (
-            String::from("o(AB)C"),
-            Matrix3::new(2, 0, 0, 1, 1, 0, 0, 0, 1),
-        ),
-        (
-            String::from("o(AB)C"),
-            Matrix3::new(1, 1, 0, -1, 1, 0, 0, 0, 1),
-        ),
-        (String::from("oP"), Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1),),
-        (String::from("oP"), Matrix3::new(1, 0, 0, 0, 0, 1, 0, 1, 1),),
-        (
-            String::from("m(AC)I"),
-            Matrix3::new(-1, 1, 0, -1, -1, 0, -1, 0, 1),
-        ),
-        (
-            String::from("m(AC)I"),
-            Matrix3::new(0, 1, -1, 1, 1, 0, 1, 0, -1),
-        ),
-        (
-            String::from("m(AC)I"),
-            Matrix3::new(-1, 0, 1, -1, 1, 0, -2, 0, 0),
-        ),
-        (
-            String::from("m(AC)I"),
-            Matrix3::new(0, 1, -1, 1, 1, 0, 1, 0, -1),
-        ),
-        (
-            String::from("m(AC)I"),
-            Matrix3::new(-1, 1, 0, -1, -1, 0, -1, 0, 1),
-        ),
-        (
-            String::from("m(AC)I"),
-            Matrix3::new(-1, 0, 1, -1, 1, 0, -2, 0, 0),
-        ),
-        (
-            String::from("m(AC)I"),
-            Matrix3::new(1, 0, -1, 1, -1, 0, 0, -1, -1),
-        ),
-        (String::from("mP"), Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1),),
-        (String::from("aP"), Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1),),
-        (String::from("aP"), Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1),),
-        (String::from("aP"), Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1),),
-    ]);
+    pub static ref SELLING_TO_CONV_TRANS: HashMap<Vector6<usize>, Matrix3<isize>> =
+        HashMap::from([
+            (
+                Vector6::new(1, 1, 1, 1, 1, 1),
+                Matrix3::new(0, 1, 1, 1, 0, 1, 1, 1, 0)
+            ),
+            (
+                Vector6::new(0, 1, 1, 1, 1, 0),
+                Matrix3::new(1, -1, 1, 1, 1, 1, 0, 0, 2)
+            ),
+            (
+                Vector6::new(0, 0, 1, 1, 1, 0),
+                Matrix3::new(1, 0, 0, 0, 0, 1, 0, 1, 1)
+            ),
+            (
+                Vector6::new(0, 0, 1, 0, 1, 1),
+                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
+            ),
+            (
+                Vector6::new(1, 0, 1, 0, 1, 2),
+                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
+            ),
+            (
+                Vector6::new(1, 1, 2, 1, 2, 2),
+                Matrix3::new(1, 0, 1, -1, 1, 1, 0, -1, 1)
+            ),
+            (
+                Vector6::new(0, 1, 1, 1, 2, 0),
+                Matrix3::new(1, 0, 1, 0, 0, 3, 0, 1, 2)
+            ),
+            (
+                Vector6::new(1, 2, 2, 2, 2, 1),
+                Matrix3::new(0, 1, 1, 1, 0, 1, 1, 1, 0)
+            ),
+            (
+                Vector6::new(0, 1, 1, 1, 1, 2),
+                Matrix3::new(1, 0, 1, 0, 1, 1, 0, 0, 2)
+            ),
+            (
+                Vector6::new(0, 0, 1, 0, 1, 2),
+                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
+            ),
+            (
+                Vector6::new(0, 0, 1, 1, 2, 0),
+                Matrix3::new(1, 0, 0, 0, 0, 1, 0, 1, 1)
+            ),
+            (
+                Vector6::new(0, 0, 1, 2, 0, 2),
+                Matrix3::new(0, 0, 1, 1, 1, 0, 0, 1, 0)
+            ),
+            (
+                Vector6::new(1, 2, 2, 2, 2, 3),
+                Matrix3::new(1, -1, 1, 1, 1, 1, 0, 0, 2)
+            ),
+            (
+                Vector6::new(1, 2, 3, 3, 2, 1),
+                Matrix3::new(0, 1, 1, 1, 0, 1, 1, 1, 0)
+            ),
+            (
+                Vector6::new(0, 1, 1, 2, 2, 3),
+                Matrix3::new(1, 0, 1, 0, 1, 1, 0, 0, 2)
+            ),
+            (
+                Vector6::new(0, 1, 2, 2, 1, 0),
+                Matrix3::new(0, 1, 1, 1, 0, 1, 1, 1, 0)
+            ),
+            (
+                Vector6::new(0, 1, 1, 2, 2, 0),
+                Matrix3::new(1, 0, 1, 0, 1, 1, 0, 0, 2)
+            ),
+            (
+                Vector6::new(1, 0, 2, 0, 1, 3),
+                Matrix3::new(2, 0, 0, 1, 1, 0, 0, 0, 1)
+            ),
+            (
+                Vector6::new(1, 0, 2, 0, 2, 3),
+                Matrix3::new(1, 1, 0, -1, 1, 0, 0, 0, 1)
+            ),
+            (
+                Vector6::new(0, 0, 1, 0, 2, 3),
+                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
+            ),
+            (
+                Vector6::new(0, 0, 1, 2, 3, 0),
+                Matrix3::new(1, 0, 0, 0, 0, 1, 0, 1, 1)
+            ),
+            (
+                Vector6::new(1, 2, 3, 2, 3, 4),
+                Matrix3::new(-1, 1, 0, -1, -1, 0, -1, 0, 1)
+            ),
+            (
+                Vector6::new(1, 2, 3, 3, 2, 4),
+                Matrix3::new(0, 1, -1, 1, 1, 0, 1, 0, -1)
+            ),
+            (
+                Vector6::new(0, 1, 2, 3, 3, 4),
+                Matrix3::new(-1, 0, 1, -1, 1, 0, -2, 0, 0)
+            ),
+            (
+                Vector6::new(0, 1, 2, 2, 1, 3),
+                Matrix3::new(0, 1, -1, 1, 1, 0, 1, 0, -1)
+            ),
+            (
+                Vector6::new(0, 1, 2, 1, 2, 3),
+                Matrix3::new(-1, 1, 0, -1, -1, 0, -1, 0, 1)
+            ),
+            (
+                Vector6::new(0, 1, 2, 3, 3, 0),
+                Matrix3::new(-1, 0, 1, -1, 1, 0, -2, 0, 0)
+            ),
+            (
+                Vector6::new(0, 1, 2, 3, 1, 0),
+                Matrix3::new(1, 0, -1, 1, -1, 0, 0, -1, -1)
+            ),
+            (
+                Vector6::new(0, 1, 2, 0, 3, 4),
+                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
+            ),
+            (
+                Vector6::new(1, 2, 3, 4, 5, 6),
+                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
+            ),
+            (
+                Vector6::new(0, 1, 2, 3, 4, 5),
+                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
+            ),
+            (
+                Vector6::new(0, 1, 2, 3, 4, 0),
+                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
+            ),
+        ]);
 }
