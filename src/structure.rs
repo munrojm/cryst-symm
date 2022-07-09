@@ -1,3 +1,4 @@
+use crate::utils::normalize_frac_vectors;
 use nalgebra::{try_invert_to, Matrix3, Matrix3x4, Vector3};
 use std::collections::HashMap;
 use std::f32::consts::PI;
@@ -7,12 +8,9 @@ use std::string::String;
 ///Representation of a periodic unit cell of a crystal structure.
 pub struct Structure {
     pub lattice: Matrix3<f32>,
-    pub reciprocal_lattice: Matrix3<f32>,
     pub species: Vec<String>,
     pub coords: Vec<Vector3<f32>>,
     pub frac_coords: Vec<Vector3<f32>>,
-    pub formula: String,
-    pub reduced_formula: String,
 }
 
 impl Structure {
@@ -52,8 +50,6 @@ impl Structure {
         coords: Vec<Vector3<f32>>,
         coords_are_cart: bool,
     ) -> Structure {
-        let (formula, reduced_formula) = Structure::get_formulas(&species);
-        let reciprocal_lattice = Structure::get_reciprocal_lattice(&lattice);
         let frac_coords: Vec<Vector3<f32>>;
         let cart_coords: Vec<Vector3<f32>>;
 
@@ -67,22 +63,112 @@ impl Structure {
 
         Self {
             lattice: lattice,
-            reciprocal_lattice: reciprocal_lattice,
             species: species,
             coords: cart_coords,
             frac_coords: frac_coords,
-            formula: formula,
-            reduced_formula: reduced_formula,
         }
     }
 
-    pub fn apply_transformation(&mut self, trans_mat: &Matrix3<isize>) {
-        // Transforms as lattice * T = lattice'
-        // Fix to add new sites
-        let float_mat: Matrix3<f32> = Matrix3::from_iterator(trans_mat.iter().map(|&x| x as f32));
-        self.lattice = self.lattice * float_mat;
-        self.frac_coords = Self::get_frac_coords(&self.lattice, &self.coords);
+    /// Length of cell vector `a` in angstroms
+    pub fn a(&self) -> f32 {
+        return self.lattice.column(0).magnitude();
+    }
+
+    /// Length of cell vector `b` in angstroms
+    pub fn b(&self) -> f32 {
+        return self.lattice.column(1).magnitude();
+    }
+
+    /// Length of cell vector `c` in angstroms
+    pub fn c(&self) -> f32 {
+        return self.lattice.column(2).magnitude();
+    }
+
+    /// Angle `alpha` in degrees
+    pub fn alpha(&self) -> f32 {
+        return ((self.lattice.column(0).dot(&self.lattice.column(1)))
+            / (self.a().abs() * self.b().abs()))
+        .acos()
+            * (180.0 / PI);
+    }
+
+    /// Angle `beta` in degrees
+    pub fn beta(&self) -> f32 {
+        return ((self.lattice.column(1).dot(&self.lattice.column(2)))
+            / (self.b().abs() * self.c().abs()))
+        .acos()
+            * (180.0 / PI);
+    }
+
+    /// Angle `gamma` in degrees
+    pub fn gamma(&self) -> f32 {
+        return ((self.lattice.column(0).dot(&self.lattice.column(2)))
+            / (self.a().abs() * self.c().abs()))
+        .acos()
+            * (180.0 / PI);
+    }
+
+    /// Volume of cell in angstroms
+    pub fn volume(&self) -> f32 {
+        return self.lattice.determinant();
+    }
+    /// Metric tensor of lattice matrix
+    pub fn metric_tensor(&self) -> Matrix3<f32> {
+        return self.lattice.transpose() * self.lattice;
+    }
+
+    /// Transforms as `lattice * trans_mat = lattice'`
+    pub fn apply_transformation(&mut self, trans_mat: &Matrix3<isize>, pos_tol: &f32) {
+        let frac_tols = Vector3::from_iterator(
+            self.lattice
+                .column_iter()
+                .map(|col| pos_tol / col.magnitude()),
+        );
+
+        let float_trans_mat: Matrix3<f32> =
+            Matrix3::from_iterator(trans_mat.iter().map(|&x| x as f32));
+
+        let new_lattice = self.lattice * float_trans_mat;
+
+        let mut new_frac_coords: Vec<Vector3<f32>> = Vec::new();
+        let mut new_species: Vec<String> = Vec::new();
+
+        // Search for new sites in transformed cell using volume ratio
+        // to figure out how many points to look at. Might need some work.
+        for (coord, specie) in self.coords.iter().zip(&self.species) {
+            for mult in 1..(float_trans_mat.determinant().abs() as i8) + 1 {
+                for translation_vec in self.lattice.column_iter() {
+                    let frac_coord = Self::get_frac_coords(
+                        &new_lattice,
+                        &vec![*coord + (translation_vec * mult as f32)],
+                    )[0];
+
+                    let mut eq = false;
+                    for new_coord in new_frac_coords.iter() {
+                        let mut coord_diff = vec![frac_coord - new_coord];
+                        normalize_frac_vectors(&mut coord_diff, &frac_tols);
+                        let cart_coord_delta = Self::get_cart_coords(&self.lattice, &coord_diff);
+
+                        if cart_coord_delta[0].magnitude().abs() <= (pos_tol * 2.0) {
+                            eq = true;
+                            break;
+                        }
+                    }
+                    if !eq {
+                        let norm_coord = frac_coord.clone();
+                        normalize_frac_vectors(&mut vec![norm_coord], &frac_tols);
+                        new_frac_coords.push(norm_coord);
+                        new_species.push(specie.clone());
+                    }
+                }
+            }
+        }
+
+        self.lattice = new_lattice;
+        self.frac_coords = new_frac_coords;
         self.coords = Self::get_cart_coords(&self.lattice, &self.frac_coords);
+        self.species = new_species;
+        self.normalize_coords(pos_tol);
     }
 
     pub fn compute_delaunay_mat(&self) -> Matrix3x4<f32> {
@@ -106,23 +192,14 @@ impl Structure {
         }
     }
 
-    pub fn normalize_coords(&mut self, pos_tol: f32) {
+    pub fn normalize_coords(&mut self, pos_tol: &f32) {
         let frac_tols = Vector3::from_iterator(
             self.lattice
                 .column_iter()
                 .map(|col| pos_tol / col.magnitude()),
         );
 
-        for vec in self.frac_coords.iter_mut() {
-            for i in 0..3 {
-                let temp_coord = vec[i] % 1.0;
-                if temp_coord <= 0.0 - frac_tols[i] {
-                    vec[i] = temp_coord + 1.0;
-                } else if temp_coord >= 1.0 - frac_tols[i] {
-                    vec[i] = temp_coord - 1.0;
-                };
-            }
-        }
+        normalize_frac_vectors(&mut self.frac_coords, &frac_tols);
 
         let new_cart_coords = Self::get_cart_coords(&self.lattice, &self.frac_coords);
 
@@ -159,9 +236,9 @@ impl Structure {
         return new_coords;
     }
 
-    fn get_reciprocal_lattice(lattice: &Matrix3<f32>) -> Matrix3<f32> {
+    pub fn reciprocal_lattice(&self) -> Matrix3<f32> {
         let mut reciprocal_lattice = Matrix3::identity();
-        let inverted = try_invert_to(lattice.clone(), &mut reciprocal_lattice);
+        let inverted = try_invert_to(self.lattice.clone(), &mut reciprocal_lattice);
 
         if !inverted {
             panic!("Crystal lattice is not invertible!");
@@ -170,12 +247,12 @@ impl Structure {
         return reciprocal_lattice.transpose() * 2.0 * PI;
     }
 
-    fn get_formulas(species: &Vec<String>) -> (String, String) {
+    pub fn formulas(&self) -> (String, String) {
         let mut species_tally = HashMap::<&String, i8>::new();
 
         let mut max_count = 0;
 
-        for specie in species.iter() {
+        for specie in self.species.iter() {
             let count = species_tally.entry(specie).or_insert(0);
             *count += 1;
 

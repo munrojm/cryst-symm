@@ -1,5 +1,7 @@
+use crate::data::ZERO_TOL;
 use crate::structure::Structure;
-use nalgebra::{Matrix3, Matrix3x4, Vector3, Vector6};
+use crate::utils::normalize_frac_vectors;
+use nalgebra::{Matrix3, Matrix3x4, Vector3, Vector4, Vector6};
 use std::collections::HashMap;
 use std::string::String;
 
@@ -9,6 +11,13 @@ pub struct Reducer {
 }
 
 impl Reducer {
+    /// Produces a primitive structure using the following steps:
+    ///
+    /// 1. Find atom type with fewest sites.
+    /// 2. Get all new potential unit translation vectors.
+    /// 3. Select three shortest vectors which span the lattice.
+    /// 4. Create new structure and fold atomic sites into new smaller cell.
+    ///
     pub fn find_primitive_cell(&self, structure: &Structure) -> Structure {
         let mut temp_structure = structure.clone();
         let frac_tols = Vector3::from_iterator(
@@ -40,7 +49,7 @@ impl Reducer {
         //
         let new_origin = temp_structure.frac_coords[*ele_inds.get(&min_ele).unwrap() as usize];
         temp_structure.set_origin(new_origin);
-        temp_structure.normalize_coords(self.dtol);
+        temp_structure.normalize_coords(&self.dtol);
 
         //
         // 3.) Get all potential new unit translation lattice vectors
@@ -80,11 +89,11 @@ impl Reducer {
                     .zip(temp_structure.species.iter())
                 {
                     if specie == specie_p {
-                        let mut coord_delta = tr_coord - coord_p;
-                        Self::normalize_frac_vector(&mut coord_delta, &(2.0 * &frac_tols));
+                        let mut coord_delta = vec![tr_coord - coord_p];
+                        normalize_frac_vectors(&mut coord_delta, &(2.0 * &frac_tols));
 
                         let cart_coord_delta =
-                            Structure::get_cart_coords(&temp_structure.lattice, &vec![coord_delta]);
+                            Structure::get_cart_coords(&temp_structure.lattice, &coord_delta);
 
                         if cart_coord_delta.first().unwrap().magnitude().abs() <= (2.0 * self.dtol)
                         {
@@ -164,10 +173,10 @@ impl Reducer {
         for (coord, specie) in temp_frac_coords.iter().zip(&structure.species) {
             let mut eq = false;
             for new_coord in new_frac_coords.iter() {
-                let mut coord_diff = coord - new_coord;
-                Self::normalize_frac_vector(&mut coord_diff, &frac_tols);
+                let mut coord_diff = vec![coord - new_coord];
+                normalize_frac_vectors(&mut coord_diff, &frac_tols);
                 let cart_coord_delta =
-                    Structure::get_cart_coords(&temp_structure.lattice, &vec![coord_diff]);
+                    Structure::get_cart_coords(&temp_structure.lattice, &coord_diff);
 
                 if cart_coord_delta[0].magnitude().abs() <= (self.dtol * 2.0) {
                     eq = true;
@@ -175,20 +184,23 @@ impl Reducer {
                 }
             }
             if !eq {
-                let mut norm_coord = coord.clone();
-                Self::normalize_frac_vector(&mut norm_coord, &frac_tols);
+                let norm_coord = coord.clone();
+                normalize_frac_vectors(&mut vec![norm_coord], &frac_tols);
                 new_frac_coords.push(norm_coord);
                 new_species.push(specie.clone());
             }
         }
 
         let mut prim_structure = Structure::new(new_lattice, new_species, new_frac_coords, false);
-        prim_structure.normalize_coords(self.dtol);
+        prim_structure.normalize_coords(&self.dtol);
         return prim_structure;
     }
 
+    /// Produce a new structure which is Delaunay reduced.
     pub fn delaunay_reduce(&self, structure: &Structure) -> Structure {
         let mut new_structure = structure.clone();
+
+        // Defined pair map for scalar prod vector
         let pair_map: HashMap<usize, (u8, u8)> = HashMap::from([
             (0, (0, 1)),
             (1, (0, 2)),
@@ -204,26 +216,31 @@ impl Reducer {
 
         let mut count = 0;
 
-        while scalar_prods.iter().any(|val| val > &0.0001) && count <= 100 {
-            let mut pos_pair = &(0, 0);
-
+        // Iterate until all scalar prods are <= zero
+        while scalar_prods.iter().any(|val| val > &ZERO_TOL) && count <= 100 {
+            let mut max_scalar_prod = &0.0;
+            let mut max_index = 0 as usize;
             for (i, entry) in scalar_prods.iter().enumerate() {
-                if entry > &0.0001 {
-                    pos_pair = pair_map.get(&i).unwrap();
+                if entry > &ZERO_TOL && entry > &max_scalar_prod {
+                    max_scalar_prod = entry;
+                    max_index = i;
                 }
             }
 
+            let pos_pair = pair_map.get(&max_index).unwrap();
+
+            // Delaunay transformation
+            // e.g. If a*b > 0, the transformation is {a -> a, b -> -b, c -> c+B, d -> d+b}
             for i in 0..4 {
                 if !(pos_pair.0 == i || pos_pair.1 == i) {
-                    let new_col = &delaunay_mat.column(pos_pair.0 as usize)
+                    let new_col = &delaunay_mat.column(pos_pair.1 as usize)
                         + &delaunay_mat.column(i as usize);
                     delaunay_mat.set_column(i as usize, &new_col);
                 };
             }
+            let neg_column = &delaunay_mat.column(pos_pair.1 as usize) * (-1.0);
+            delaunay_mat.set_column(pos_pair.1 as usize, &neg_column);
 
-            let neg_column = &delaunay_mat.column(pos_pair.0 as usize) * (-1.0);
-
-            delaunay_mat.set_column(pos_pair.0 as usize, &neg_column);
             scalar_prods = Self::get_scalar_prods(&delaunay_mat);
             count += 1;
         }
@@ -232,15 +249,38 @@ impl Reducer {
             panic!("Reached max number of iterations without reduction!")
         }
 
-        let new_lattice = Matrix3::from(delaunay_mat.fixed_columns::<3>(0));
+        // New lattice vectors are chosen as shortest from {a, b, c, d, a+b, b+c, c+a}
+        let base_comb_vecs: Vec<Vector4<f32>> = vec![
+            Vector4::new(1.0, 0.0, 0.0, 0.0),
+            Vector4::new(0.0, 1.0, 0.0, 0.0),
+            Vector4::new(0.0, 0.0, 1.0, 0.0),
+            Vector4::new(0.0, 0.0, 0.0, 1.0),
+            Vector4::new(1.0, 1.0, 0.0, 0.0),
+            Vector4::new(0.0, 1.0, 1.0, 0.0),
+            Vector4::new(1.0, 0.0, 1.0, 0.0),
+        ];
+
+        let mut combination_vecs: Vec<Vector3<f32>> = Vec::new();
+
+        for comb_vec in base_comb_vecs {
+            let transformed_vec = delaunay_mat * comb_vec;
+            combination_vecs.push(transformed_vec);
+        }
+
+        let new_lattice_vecs = self.get_shortest_translation_vecs(&mut combination_vecs);
+
+        let new_lattice = Matrix3::from_columns(&new_lattice_vecs);
+
+        // We assume no coord folding as cell will be a similar size? (not sure..this may need work)
         let new_frac_coords = Structure::get_frac_coords(&new_lattice, &new_structure.coords);
 
         new_structure = Structure::new(new_lattice, new_structure.species, new_frac_coords, false);
-        new_structure.normalize_coords(self.dtol);
+        new_structure.normalize_coords(&self.dtol);
 
         return new_structure;
     }
 
+    /// Function to get three shortest cartestian translation vectors which still span the lattice.
     fn get_shortest_translation_vecs(
         &self,
         cart_vecs: &mut Vec<Vector3<f32>>,
@@ -283,16 +323,5 @@ impl Reducer {
             }
         }
         return scalar_prods;
-    }
-
-    fn normalize_frac_vector(vec: &mut Vector3<f32>, frac_tols: &Vector3<f32>) {
-        for i in 0..3 {
-            vec[i] = vec[i] % 1.0;
-            if vec[i] < (-1.0 * frac_tols[i]) {
-                vec[i] += 1.0;
-            } else if vec[i] > (1.0 - frac_tols[i]) {
-                vec[i] -= 1.0;
-            };
-        }
     }
 }

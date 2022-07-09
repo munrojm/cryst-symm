@@ -2,6 +2,7 @@ pub mod analyzer;
 pub mod data;
 pub mod reduce;
 pub mod structure;
+pub mod utils;
 
 use analyzer::SymmetryAnalyzer;
 use nalgebra::{Matrix3, Vector3};

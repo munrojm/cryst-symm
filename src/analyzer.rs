@@ -29,14 +29,19 @@ impl SymmetryAnalyzer {
 
         let trans_mat = SELLING_TO_CONV_TRANS.get(&simplified_selling);
 
-        let mut new_structure = structure.clone();
+        // Need to alter lattice with new delaunay mat..
+        // First get transformation from old -> new delaunay then transform del_prim
+        let new_lattice = Matrix3::from(delaunay_mat.fixed_slice::<3, 3>(0, 0));
 
-        let new_latt: Matrix3<f32> = Matrix3::from(delaunay_mat.fixed_slice::<3, 3>(0, 0));
-        let mat: Matrix3<f32> =
-            Matrix3::from_iterator(trans_mat.unwrap().iter().map(|&x| x as f32));
+        let mut new_structure = Structure::new(
+            new_lattice,
+            del_prim_structure.species,
+            del_prim_structure.coords,
+            true,
+        );
 
         match trans_mat {
-            Some(mat) => new_structure.apply_transformation(&mat.transpose()),
+            Some(mat) => new_structure.apply_transformation(&mat, &self.dtol),
             None => return Option::None,
         }
 
@@ -95,9 +100,7 @@ impl SymmetryAnalyzer {
 
         for vec in base_vecs.into_iter().permutations(4) {
             let mat = Matrix4::from_columns(&vec[..]);
-            //if mat[15] == 1.0 {
             mats.push(mat);
-            //}
         }
 
         return mats;
