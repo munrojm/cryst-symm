@@ -2,7 +2,7 @@ use crate::data::{SELLING_TO_BRAVAIS, SELLING_TO_CONV_TRANS, ZERO_TOL};
 use crate::reduce::Reducer;
 use crate::structure::Structure;
 use itertools::Itertools;
-use nalgebra::{Matrix3, Matrix3x4, Matrix4, Vector4, Vector6};
+use nalgebra::{Matrix3, Matrix3x4, Matrix4, Vector3, Vector4, Vector6};
 use std::collections::HashMap;
 use std::option::Option;
 use std::string::String;
@@ -13,6 +13,10 @@ pub struct SymmetryAnalyzer {
 }
 
 impl SymmetryAnalyzer {
+    /// Obtains the conventional structure
+    ///
+    /// TODO: Make certain cells pretty (e.g. cubic, rh) \
+    /// TODO: Handle Monoclinic transformations from I-centered
     pub fn get_conventional_structure(&self, structure: &Structure) -> Option<Structure> {
         let reducer = Reducer { dtol: self.dtol };
 
@@ -29,8 +33,6 @@ impl SymmetryAnalyzer {
 
         let trans_mat = SELLING_TO_CONV_TRANS.get(&simplified_selling);
 
-        // Need to alter lattice with new delaunay mat..
-        // First get transformation from old -> new delaunay then transform del_prim
         let new_lattice = Matrix3::from(delaunay_mat.fixed_slice::<3, 3>(0, 0));
 
         let mut new_structure = Structure::new(

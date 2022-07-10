@@ -118,6 +118,7 @@ impl Structure {
     }
 
     /// Transforms as `lattice * trans_mat = lattice'`
+    /// TODO: FIX finding new coords
     pub fn apply_transformation(&mut self, trans_mat: &Matrix3<isize>, pos_tol: &f32) {
         let frac_tols = Vector3::from_iterator(
             self.lattice
@@ -128,20 +129,42 @@ impl Structure {
         let float_trans_mat: Matrix3<f32> =
             Matrix3::from_iterator(trans_mat.iter().map(|&x| x as f32));
 
+        let mut inv_float_trans_mat: Matrix3<f32> = Matrix3::identity();
+
+        let inverted = try_invert_to(float_trans_mat, &mut inv_float_trans_mat);
+
+        if !inverted {
+            panic!("Transformation matrix is not invertible!");
+        }
+
         let new_lattice = self.lattice * float_trans_mat;
 
         let mut new_frac_coords: Vec<Vector3<f32>> = Vec::new();
         let mut new_species: Vec<String> = Vec::new();
 
+        println!("{:?}", self.lattice);
+
+        let translation_vecs: Vec<Vector3<f32>> = vec![
+            Vector3::new(1.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+            Vector3::new(0.0, 0.0, 1.0),
+            Vector3::new(1.0, 1.0, 0.0),
+            Vector3::new(0.0, 1.0, 1.0),
+            Vector3::new(1.0, 0.0, 1.0),
+            Vector3::new(1.0, 1.0, 1.0),
+        ];
+
+        let volume_ratio = float_trans_mat.determinant().abs();
+
         // Search for new sites in transformed cell using volume ratio
-        // to figure out how many points to look at. Might need some work.
-        for (coord, specie) in self.coords.iter().zip(&self.species) {
-            for mult in 1..(float_trans_mat.determinant().abs() as i8) + 1 {
-                for translation_vec in self.lattice.column_iter() {
-                    let frac_coord = Self::get_frac_coords(
-                        &new_lattice,
-                        &vec![*coord + (translation_vec * mult as f32)],
-                    )[0];
+        // TODO: Use hashmap with species to get lists which can be ordered on output
+        let mut mult = 0;
+        while (new_frac_coords.len() / self.coords.len()) < volume_ratio as usize {
+            for (coord, specie) in self.frac_coords.iter().zip(&self.species) {
+                for translation_vec in translation_vecs.iter() {
+                    let mut frac_coord = *coord + (translation_vec * mult as f32);
+
+                    frac_coord = inv_float_trans_mat * frac_coord;
 
                     let mut eq = false;
                     for new_coord in new_frac_coords.iter() {
@@ -162,6 +185,7 @@ impl Structure {
                     }
                 }
             }
+            mult += 1;
         }
 
         self.lattice = new_lattice;

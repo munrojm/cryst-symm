@@ -18,7 +18,7 @@ fn get_bravais(
     coords_are_cart: bool,
     tol: f32,
 ) -> PyResult<Option<(Vec<f32>, Vec<String>, Vec<Vec<f32>>)>> {
-    let formatted_lattice = Matrix3::from_iterator(lattice.into_iter());
+    let formatted_lattice = Matrix3::from_iterator(lattice.into_iter()); // Lattice needs to be column-major iterator
     let formatted_coords: Vec<Vector3<f32>> = coords
         .iter()
         .map(|vec| Vector3::new(vec[0], vec[1], vec[2]))
