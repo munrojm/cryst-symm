@@ -118,8 +118,9 @@ impl Structure {
         return self.lattice.transpose() * self.lattice;
     }
 
-    /// Transforms as `lattice * trans_mat = lattice'`
-    /// TODO: FIX finding new coords
+    /// Applied a transformation to the structure as: `lattice * trans_mat = lattice'`
+    ///
+    /// If the transformation results in a volume increase, then new atomic sites are searched for and added to the transformed cell.
     pub fn apply_transformation(&mut self, trans_mat: &Matrix3<isize>, pos_tol: &f32) {
         let frac_tols = Vector3::from_iterator(
             self.lattice
@@ -156,9 +157,8 @@ impl Structure {
         let volume_ratio = float_trans_mat.determinant().abs();
 
         // Search for new sites in transformed cell using volume ratio
-        // TODO: Use hashmap with species to get lists which can be ordered on output
         let mut mult = 0;
-        while (new_frac_coords.len() / self.coords.len()) < volume_ratio as usize {
+        while (new_frac_coords.len() / self.coords.len()) < volume_ratio as usize || mult <= 10 {
             for (coord, specie) in self.frac_coords.iter().zip(&self.species) {
                 for translation_vec in translation_vecs.iter() {
                     let mut frac_coord = *coord + (translation_vec * mult as f32);
@@ -185,6 +185,10 @@ impl Structure {
                 }
             }
             mult += 1;
+        }
+
+        if mult == 10 {
+            panic!("Could not find all atomic sites in larger transformed cell.");
         }
 
         self.lattice = new_lattice;
