@@ -45,11 +45,11 @@ impl Reducer {
             .0
             .clone();
         //
-        // 2.) Shift origin to first atom of min_ele type and normalize coords
+        // 2.) Shift origin to first atom of min_ele type and normalize coords (not needed)
         //
-        let new_origin = temp_structure.frac_coords[*ele_inds.get(&min_ele).unwrap() as usize];
-        temp_structure.set_origin(new_origin);
-        temp_structure.normalize_coords(&self.dtol);
+        // let new_origin = temp_structure.frac_coords[*ele_inds.get(&min_ele).unwrap() as usize];
+        // temp_structure.set_origin(new_origin);
+        // temp_structure.normalize_coords(&self.dtol);
 
         //
         // 3.) Get all potential new unit translation lattice vectors
