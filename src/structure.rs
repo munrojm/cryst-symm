@@ -1,4 +1,5 @@
 use crate::utils::normalize_frac_vectors;
+use itertools::izip;
 use nalgebra::{try_invert_to, Matrix3, Matrix3x4, Vector3};
 use std::collections::HashMap;
 use std::f32::consts::PI;
@@ -142,8 +143,6 @@ impl Structure {
         let mut new_frac_coords: Vec<Vector3<f32>> = Vec::new();
         let mut new_species: Vec<String> = Vec::new();
 
-        println!("{:?}", self.lattice);
-
         let translation_vecs: Vec<Vector3<f32>> = vec![
             Vector3::new(1.0, 0.0, 0.0),
             Vector3::new(0.0, 1.0, 0.0),
@@ -216,6 +215,7 @@ impl Structure {
         }
     }
 
+    /// Normalizes fractional atomic positions to ensure all sites are within the unit cell
     pub fn normalize_coords(&mut self, pos_tol: &f32) {
         let frac_tols = Vector3::from_iterator(
             self.lattice
@@ -225,9 +225,25 @@ impl Structure {
 
         normalize_frac_vectors(&mut self.frac_coords, &frac_tols);
 
-        let new_cart_coords = Self::get_cart_coords(&self.lattice, &self.frac_coords);
+        let cart_coords = Self::get_cart_coords(&self.lattice, &self.frac_coords);
 
+        // Sort coords according to species type to keep organized
+        let mut zipped_coords: Vec<(&String, &Vector3<f32>, &Vector3<f32>)> =
+            izip!(&self.species, &cart_coords, &self.frac_coords).collect();
+
+        zipped_coords.sort_by(|a, b| a.0.cmp(b.0));
+
+        let new_species: Vec<String> = zipped_coords.iter().map(|tuple| tuple.0.clone()).collect();
+
+        let new_cart_coords: Vec<Vector3<f32>> =
+            zipped_coords.iter().map(|tuple| tuple.1.clone()).collect();
+
+        let new_frac_coords: Vec<Vector3<f32>> =
+            zipped_coords.iter().map(|tuple| tuple.2.clone()).collect();
+
+        self.species = new_species;
         self.coords = new_cart_coords;
+        self.frac_coords = new_frac_coords;
     }
 
     pub fn get_cart_coords(
