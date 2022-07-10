@@ -3,6 +3,9 @@ name = "crystsymm"
 version = "0.1.0"
 edition = "2018"
 
+[profile.release]
+opt-level = 3
+
 [lib]
 name = "crystsymm"
 crate-type = ["cdylib"]

@@ -21,18 +21,19 @@ impl Structure {
     ///
     /// * `lattice` - A 3x3 matrix with columns containing the lattice vectors.
     /// * `species` - A list of strings representing the elements at each atomic site.
-    /// * `coords` - A list of cartesiean vector coordinates of the atomic sites.
+    /// * `coords` - A list of cartesian (Å) or fractional vector coordinates of the atomic sites.
+    /// * `coords_are_cart` - Whether the input coordinates are in a cartesian basis.
     ///
     /// # Examples
     ///
     /// ```
     /// use nalgebra::{Matrix3, Vector3};
     ///
-    /// let a1 = Vector3::new(-3.748244, 0.0, 0.0);
-    /// let a2 = Vector3::new(1.874122, -4.750729, 0.0);
-    /// let a3 = Vector3::new(0.0, 1.5562529, 6.25794799);
+    /// let a = Vector3::new(-3.748244, 0.0, 0.0);
+    /// let b = Vector3::new(1.874122, -4.750729, 0.0);
+    /// let c = Vector3::new(0.0, 1.5562529, 6.25794799);
     ///
-    /// let lattice = Matrix3::from_columns(&[a1, a2, a3]);
+    /// let lattice = Matrix3::from_columns(&[a, b, c]);
     ///
     /// let elements = ["Au", "Au", "Se", "Se"];
     /// let species: Vec<String> = elements.iter().map(|s| s.to_string()).collect();
@@ -109,7 +110,7 @@ impl Structure {
             * (180.0 / PI);
     }
 
-    /// Volume of cell in angstroms
+    /// Volume of the unit cell in angstroms
     pub fn volume(&self) -> f32 {
         return self.lattice.determinant();
     }
@@ -156,9 +157,9 @@ impl Structure {
 
         let volume_ratio = float_trans_mat.determinant().abs();
 
-        // Search for new sites in transformed cell using volume ratio
+        // Search for new sites in transformed cell using volume ratio to determine proper number of sites
         let mut mult = 0;
-        while (new_frac_coords.len() / self.coords.len()) < volume_ratio as usize || mult <= 10 {
+        while (new_frac_coords.len() / self.coords.len()) < volume_ratio as usize && mult <= 10 {
             for (coord, specie) in self.frac_coords.iter().zip(&self.species) {
                 for translation_vec in translation_vecs.iter() {
                     let mut frac_coord = *coord + (translation_vec * mult as f32);
@@ -198,7 +199,8 @@ impl Structure {
         self.normalize_coords(pos_tol);
     }
 
-    pub fn compute_delaunay_mat(&self) -> Matrix3x4<f32> {
+    /// Computes the Delaunay matrix from the lattice matrix of the structure.
+    pub fn delaunay_matrix(&self) -> Matrix3x4<f32> {
         let d4 = -1.0 * (self.lattice.column(0) + self.lattice.column(1) + self.lattice.column(2));
 
         let cols: Vec<Vector3<f32>> = self
@@ -213,13 +215,15 @@ impl Structure {
         return delaunay_mat;
     }
 
+    /// Sets a new origin point for the unit cell.
     pub fn set_origin(&mut self, fractional_vector: Vector3<f32>) {
         for vec in self.frac_coords.iter_mut() {
             *vec -= fractional_vector;
         }
+        self.coords = Self::get_cart_coords(&self.lattice, &self.frac_coords);
     }
 
-    /// Normalizes fractional atomic positions to ensure all sites are within the unit cell
+    /// Normalizes fractional atomic positions to ensure all sites are within the unit cell.
     pub fn normalize_coords(&mut self, pos_tol: &f32) {
         let frac_tols = Vector3::from_iterator(
             self.lattice

@@ -2,7 +2,7 @@ use crate::data::{SELLING_TO_BRAVAIS, SELLING_TO_CONV_TRANS, ZERO_TOL};
 use crate::reduce::Reducer;
 use crate::structure::Structure;
 use itertools::Itertools;
-use nalgebra::{Matrix3, Matrix3x4, Matrix4, Vector3, Vector4, Vector6};
+use nalgebra::{Matrix3, Matrix3x4, Matrix4, Vector4, Vector6};
 use std::collections::HashMap;
 use std::option::Option;
 use std::string::String;
@@ -23,7 +23,7 @@ impl SymmetryAnalyzer {
         let prim_structure = reducer.find_primitive_cell(structure);
         let del_prim_structure = reducer.delaunay_reduce(&prim_structure);
 
-        let mut delaunay_mat = del_prim_structure.compute_delaunay_mat();
+        let mut delaunay_mat = del_prim_structure.delaunay_matrix();
 
         let _ = self.delaunay_to_bravais(&mut delaunay_mat);
 

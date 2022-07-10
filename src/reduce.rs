@@ -210,7 +210,7 @@ impl Reducer {
             (5, (2, 3)),
         ]);
 
-        let mut delaunay_mat = structure.compute_delaunay_mat();
+        let mut delaunay_mat = structure.delaunay_matrix();
 
         let mut scalar_prods = Self::get_scalar_prods(&delaunay_mat);
 
@@ -271,7 +271,7 @@ impl Reducer {
 
         let new_lattice = Matrix3::from_columns(&new_lattice_vecs);
 
-        // We assume no coord folding as cell will be a similar size? (not sure..this may need work)
+        // TODO: We assume no coord folding? (May need to assume coord folding and eliminate duplicates.)
         let new_frac_coords = Structure::get_frac_coords(&new_lattice, &new_structure.coords);
 
         new_structure = Structure::new(new_lattice, new_structure.species, new_frac_coords, false);
