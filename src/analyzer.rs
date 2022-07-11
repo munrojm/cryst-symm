@@ -63,22 +63,28 @@ impl SymmetryAnalyzer {
         let bravais_symbol = self.delaunay_to_bravais(&mut delaunay_mat)?;
 
         let full_trans_mat =
-            CENTERING_TO_PRIM_TRANS.get(&bravais_symbol.chars().nth(1).unwrap().to_string())?;
+            CENTERING_TO_PRIM_TRANS.get(&bravais_symbol.chars().nth(1).unwrap().to_string());
 
-        let float_full_trans_mat: Matrix4<f32> =
-            Matrix4::from_iterator(full_trans_mat.iter().map(|&x| x as f32));
+        match full_trans_mat {
+            Some(mat) => {
+                let float_full_trans_mat: Matrix4<f32> =
+                    Matrix4::from_iterator(mat.iter().map(|&x| x as f32));
 
-        //TODO: Fix matrix not being invertible?
-        let trans_mat: Matrix3<f32> = Matrix3::from(float_full_trans_mat.fixed_slice::<3, 3>(0, 0))
-            / float_full_trans_mat.m44;
+                let trans_mat: Matrix3<f32> =
+                    Matrix3::from(float_full_trans_mat.fixed_slice::<3, 3>(0, 0))
+                        / float_full_trans_mat.m44;
 
-        let mut conv_structure = self.get_standard_conventional_structure(structure)?;
+                let mut conv_structure =
+                    self.get_standard_conventional_structure(&del_prim_structure)?;
 
-        conv_structure.apply_transformation(&trans_mat, &self.dtol);
+                conv_structure.apply_transformation(&trans_mat, &self.dtol);
 
-        conv_structure.normalize_coords(&self.dtol);
+                conv_structure.normalize_coords(&self.dtol);
 
-        return Option::Some(conv_structure);
+                return Option::Some(conv_structure);
+            }
+            None => return Option::None,
+        }
     }
 
     fn delaunay_to_bravais(&self, delaunay_mat: &mut Matrix3x4<f32>) -> Option<&String> {
@@ -96,7 +102,6 @@ impl SymmetryAnalyzer {
             }
         }
 
-        println!("{:?}", bravais);
         return bravais;
     }
 
