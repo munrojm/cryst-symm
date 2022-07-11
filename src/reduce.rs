@@ -20,7 +20,7 @@ impl Reducer {
     /// 4. Create new structure and fold atomic sites into new smaller cell.
     ///
     pub fn find_primitive_cell(&self, structure: &Structure) -> Structure {
-        let mut temp_structure = structure.clone();
+        let temp_structure = structure.clone();
         let frac_tols = Vector3::from_iterator(
             temp_structure
                 .lattice
