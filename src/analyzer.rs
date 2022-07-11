@@ -17,7 +17,7 @@ impl SymmetryAnalyzer {
     ///
     /// TODO: Make certain cells pretty (e.g. cubic, rh) \
     /// TODO: Handle Monoclinic transformations from I-centered
-    pub fn get_standard_conventional_structure(&self, structure: &Structure) -> Option<Structure> {
+    pub fn get_standard_conventional_structure(&self, structure: &Structure) -> Structure {
         let reducer = Reducer { dtol: self.dtol };
 
         let prim_structure = reducer.find_primitive_cell(structure);
@@ -47,20 +47,21 @@ impl SymmetryAnalyzer {
                 let float_mat = Matrix3::from_iterator(mat.iter().map(|&x| x as f32));
                 new_structure.apply_transformation(&float_mat, &self.dtol)
             }
-            None => return Option::None,
+            None => panic!("Could not find the appropriate Delaunay transformation matrix!"),
         }
 
-        return Option::Some(new_structure);
+        return new_structure;
     }
 
-    pub fn get_standard_primitive_structure(&self, structure: &Structure) -> Option<Structure> {
+    pub fn get_standard_primitive_structure(&self, structure: &Structure) -> Structure {
         let reducer = Reducer { dtol: self.dtol };
 
         let prim_structure = reducer.find_primitive_cell(structure);
         let del_prim_structure = reducer.delaunay_reduce(&prim_structure);
+        let mut conv_structure = self.get_standard_conventional_structure(&del_prim_structure);
 
         let mut delaunay_mat = del_prim_structure.delaunay_matrix();
-        let bravais_symbol = self.delaunay_to_bravais(&mut delaunay_mat)?;
+        let bravais_symbol = self.delaunay_to_bravais(&mut delaunay_mat).unwrap();
 
         let full_trans_mat =
             CENTERING_TO_PRIM_TRANS.get(&bravais_symbol.chars().nth(1).unwrap().to_string());
@@ -74,17 +75,14 @@ impl SymmetryAnalyzer {
                     Matrix3::from(float_full_trans_mat.fixed_slice::<3, 3>(0, 0))
                         / float_full_trans_mat.m44;
 
-                let mut conv_structure =
-                    self.get_standard_conventional_structure(&del_prim_structure)?;
-
                 conv_structure.apply_transformation(&trans_mat, &self.dtol);
 
                 conv_structure.normalize_coords(&self.dtol);
-
-                return Option::Some(conv_structure);
             }
-            None => return Option::None,
+            None => panic!("Could not find primitive to conventional transformation matrix!"),
         }
+
+        return conv_structure;
     }
 
     fn delaunay_to_bravais(&self, delaunay_mat: &mut Matrix3x4<f32>) -> Option<&String> {

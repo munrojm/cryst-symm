@@ -17,7 +17,7 @@ fn get_standard_conventional_structure(
     coords: Vec<Vec<f32>>,
     coords_are_cart: bool,
     tol: f32,
-) -> PyResult<Option<(Vec<f32>, Vec<String>, Vec<Vec<f32>>)>> {
+) -> PyResult<(Vec<f32>, Vec<String>, Vec<Vec<f32>>)> {
     let formatted_lattice = Matrix3::from_iterator(lattice.into_iter()); // Lattice needs to be column-major iterator
     let formatted_coords: Vec<Vector3<f32>> = coords
         .iter()
@@ -33,18 +33,13 @@ fn get_standard_conventional_structure(
     let sa = SymmetryAnalyzer { dtol: tol };
     let conv_struct = sa.get_standard_conventional_structure(&structure);
 
-    match conv_struct {
-        Some(s) => {
-            let lattice_vec: Vec<f32> = s.lattice.iter().map(|x| *x).collect();
-            let mut coords_vec: Vec<Vec<f32>> = Vec::new();
-            for vec in s.frac_coords.iter() {
-                let new_vec: Vec<f32> = vec.iter().map(|x| *x).collect();
-                coords_vec.push(new_vec);
-            }
-            Ok(Option::Some((lattice_vec, s.species, coords_vec)))
-        }
-        None => return Ok(Option::None),
+    let lattice_vec: Vec<f32> = conv_struct.lattice.iter().map(|x| *x).collect();
+    let mut coords_vec: Vec<Vec<f32>> = Vec::new();
+    for vec in conv_struct.frac_coords.iter() {
+        let new_vec: Vec<f32> = vec.iter().map(|x| *x).collect();
+        coords_vec.push(new_vec);
     }
+    Ok((lattice_vec, conv_struct.species, coords_vec))
 }
 
 #[pyfunction]
@@ -54,7 +49,7 @@ fn get_standard_primitive_structure(
     coords: Vec<Vec<f32>>,
     coords_are_cart: bool,
     tol: f32,
-) -> PyResult<Option<(Vec<f32>, Vec<String>, Vec<Vec<f32>>)>> {
+) -> PyResult<(Vec<f32>, Vec<String>, Vec<Vec<f32>>)> {
     let formatted_lattice = Matrix3::from_iterator(lattice.into_iter()); // Lattice needs to be column-major iterator
     let formatted_coords: Vec<Vector3<f32>> = coords
         .iter()
@@ -68,20 +63,15 @@ fn get_standard_primitive_structure(
         coords_are_cart,
     );
     let sa = SymmetryAnalyzer { dtol: tol };
-    let conv_struct = sa.get_standard_primitive_structure(&structure);
+    let prim_struct = sa.get_standard_primitive_structure(&structure);
 
-    match conv_struct {
-        Some(s) => {
-            let lattice_vec: Vec<f32> = s.lattice.iter().map(|x| *x).collect();
-            let mut coords_vec: Vec<Vec<f32>> = Vec::new();
-            for vec in s.frac_coords.iter() {
-                let new_vec: Vec<f32> = vec.iter().map(|x| *x).collect();
-                coords_vec.push(new_vec);
-            }
-            Ok(Option::Some((lattice_vec, s.species, coords_vec)))
-        }
-        None => return Ok(Option::None),
+    let lattice_vec: Vec<f32> = prim_struct.lattice.iter().map(|x| *x).collect();
+    let mut coords_vec: Vec<Vec<f32>> = Vec::new();
+    for vec in prim_struct.frac_coords.iter() {
+        let new_vec: Vec<f32> = vec.iter().map(|x| *x).collect();
+        coords_vec.push(new_vec);
     }
+    Ok((lattice_vec, prim_struct.species, coords_vec))
 }
 
 /// A Python module implemented in Rust. The name of this function must match

@@ -156,7 +156,8 @@ impl Structure {
 
         // Search for new sites in transformed cell using volume ratio to determine proper number of sites
         let mut mult = 0;
-        while (new_frac_coords.len() / self.coords.len()) < volume_ratio as usize && mult <= 10 {
+        while (new_frac_coords.len() as f32 / self.coords.len() as f32) < volume_ratio && mult <= 10
+        {
             for (coord, specie) in self.frac_coords.iter().zip(&self.species) {
                 for translation_vec in translation_vecs.iter() {
                     let mut frac_coord = *coord + (translation_vec * mult as f32);
