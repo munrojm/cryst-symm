@@ -3,6 +3,7 @@ use crate::structure::Structure;
 use crate::utils::normalize_frac_vectors;
 use nalgebra::{Matrix3, Matrix3x4, Vector3, Vector4, Vector6};
 use std::collections::HashMap;
+use std::iter::FromIterator;
 use std::string::String;
 
 #[derive(Debug, Copy, Clone)]
@@ -38,7 +39,12 @@ impl Reducer {
             ele_inds.entry(ele).or_insert(ele_ind as u8);
         }
 
-        let min_ele = type_count
+        // Sorting ensures determinism when getting min
+        let mut sorted_pairs: Vec<(&String, u8)> = Vec::from_iter(type_count.into_iter());
+
+        sorted_pairs.sort_by(|a, b| a.0.cmp(b.0));
+
+        let min_ele = &sorted_pairs
             .iter()
             .min_by_key(|entry| entry.1)
             .unwrap()
