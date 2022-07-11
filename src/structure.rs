@@ -122,25 +122,22 @@ impl Structure {
     /// Applied a transformation to the structure as: `lattice * trans_mat = lattice'`
     ///
     /// If the transformation results in a volume increase, then new atomic sites are searched for and added to the transformed cell.
-    pub fn apply_transformation(&mut self, trans_mat: &Matrix3<isize>, pos_tol: &f32) {
+    pub fn apply_transformation(&mut self, trans_mat: &Matrix3<f32>, pos_tol: &f32) {
         let frac_tols = Vector3::from_iterator(
             self.lattice
                 .column_iter()
                 .map(|col| pos_tol / col.magnitude()),
         );
 
-        let float_trans_mat: Matrix3<f32> =
-            Matrix3::from_iterator(trans_mat.iter().map(|&x| x as f32));
+        let mut inv_trans_mat: Matrix3<f32> = Matrix3::identity();
 
-        let mut inv_float_trans_mat: Matrix3<f32> = Matrix3::identity();
-
-        let inverted = try_invert_to(float_trans_mat, &mut inv_float_trans_mat);
+        let inverted = try_invert_to(trans_mat.clone(), &mut inv_trans_mat);
 
         if !inverted {
             panic!("Transformation matrix is not invertible!");
         }
 
-        let new_lattice = self.lattice * float_trans_mat;
+        let new_lattice = self.lattice * trans_mat;
 
         let mut new_frac_coords: Vec<Vector3<f32>> = Vec::new();
         let mut new_species: Vec<String> = Vec::new();
@@ -155,7 +152,7 @@ impl Structure {
             Vector3::new(1.0, 1.0, 1.0),
         ];
 
-        let volume_ratio = float_trans_mat.determinant().abs();
+        let volume_ratio = trans_mat.determinant().abs();
 
         // Search for new sites in transformed cell using volume ratio to determine proper number of sites
         let mut mult = 0;
@@ -164,7 +161,7 @@ impl Structure {
                 for translation_vec in translation_vecs.iter() {
                     let mut frac_coord = *coord + (translation_vec * mult as f32);
 
-                    frac_coord = inv_float_trans_mat * frac_coord;
+                    frac_coord = inv_trans_mat * frac_coord;
 
                     let mut eq = false;
                     for new_coord in new_frac_coords.iter() {
