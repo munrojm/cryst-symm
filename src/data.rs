@@ -1,182 +1,160 @@
 use lazy_static::lazy_static;
 use nalgebra::{Matrix3, Matrix4, Vector6};
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter, Result};
 use std::string::String;
 
 pub static ZERO_TOL: f32 = 1e-6; // Zero value tolerance
 
+#[derive(Debug, Clone, Copy)]
+pub enum BravaisType {
+    aP,
+    mP,
+    mC,
+    mI,
+    oP,
+    oC,
+    oI,
+    oF,
+    tP,
+    tI,
+    hR,
+    hP,
+    cP,
+    cI,
+    cF,
+}
+
+impl Display for BravaisType {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        match &self {
+            BravaisType::aP => write!(f, "aP"),
+            BravaisType::mP => write!(f, "mP"),
+            BravaisType::mC => write!(f, "mC"),
+            BravaisType::mI => write!(f, "mI"),
+            BravaisType::oP => write!(f, "oP"),
+            BravaisType::oC => write!(f, "oC"),
+            BravaisType::oI => write!(f, "oI"),
+            BravaisType::oF => write!(f, "oF"),
+            BravaisType::tP => write!(f, "tP"),
+            BravaisType::tI => write!(f, "tI"),
+            BravaisType::hR => write!(f, "hR"),
+            BravaisType::hP => write!(f, "hP"),
+            BravaisType::cP => write!(f, "cP"),
+            BravaisType::cI => write!(f, "cI"),
+            BravaisType::cF => write!(f, "cF"),
+        }
+    }
+}
+
 lazy_static! {
-    // Bravais symbol lookup from integer Selling vector
-    pub static ref SELLING_TO_BRAVAIS: HashMap<Vector6<usize>, String> = {
+    // Bravais symbol lookup from lattice character number
+    pub static ref LATTICE_CHAR_TO_BRAVAIS: HashMap<u8, BravaisType> = {
         HashMap::from([
-            (Vector6::new(1, 1, 1, 1, 1, 1), String::from("cI")),
-            (Vector6::new(0, 1, 1, 1, 1, 0), String::from("cF")),
-            (Vector6::new(0, 0, 1, 1, 1, 0), String::from("cP")),
-            (Vector6::new(0, 0, 1, 0, 1, 1), String::from("cP")),
-            (Vector6::new(1, 0, 1, 0, 1, 2), String::from("hP")),
-            (Vector6::new(1, 1, 2, 1, 2, 2), String::from("hR")),
-            (Vector6::new(0, 1, 1, 1, 2, 0), String::from("hR")),
-            (Vector6::new(1, 2, 2, 2, 2, 1), String::from("tI")),
-            (Vector6::new(0, 1, 1, 1, 1, 2), String::from("tI")),
-            (Vector6::new(0, 0, 1, 0, 1, 2), String::from("tP")),
-            (Vector6::new(0, 0, 1, 1, 2, 0), String::from("tP")),
-            (Vector6::new(0, 0, 1, 2, 0, 2), String::from("tP")),
-            (Vector6::new(1, 2, 2, 2, 2, 3), String::from("oF")),
-            (Vector6::new(1, 2, 3, 3, 2, 1), String::from("oI")),
-            (Vector6::new(0, 1, 1, 2, 2, 3), String::from("oI")),
-            (Vector6::new(0, 1, 2, 2, 1, 0), String::from("oI")),
-            (Vector6::new(0, 1, 1, 2, 2, 0), String::from("oI")),
-            (Vector6::new(1, 0, 2, 0, 1, 3), String::from("o(AB)C")),
-            (Vector6::new(1, 0, 2, 0, 2, 3), String::from("o(AB)C")),
-            (Vector6::new(0, 0, 1, 0, 2, 3), String::from("oP")),
-            (Vector6::new(0, 0, 1, 2, 3, 0), String::from("oP")),
-            (Vector6::new(1, 2, 3, 2, 3, 4), String::from("m(AC)I")),
-            (Vector6::new(1, 2, 3, 3, 2, 4), String::from("m(AC)I")),
-            (Vector6::new(0, 1, 2, 3, 3, 4), String::from("m(AC)I")),
-            (Vector6::new(0, 1, 2, 2, 1, 3), String::from("m(AC)I")),
-            (Vector6::new(0, 1, 2, 1, 2, 3), String::from("m(AC)I")),
-            (Vector6::new(0, 1, 2, 3, 3, 0), String::from("m(AC)I")),
-            (Vector6::new(0, 1, 2, 3, 1, 0), String::from("m(AC)I")),
-            (Vector6::new(0, 1, 2, 0, 3, 4), String::from("mP")),
-            (Vector6::new(1, 2, 3, 4, 5, 6), String::from("aP")),
-            (Vector6::new(0, 1, 2, 3, 4, 5), String::from("aP")),
-            (Vector6::new(0, 1, 2, 3, 4, 0), String::from("aP")),
+            // First set, A=B=C
+            (1, BravaisType::cF),
+            (2, BravaisType::hR),
+            (3, BravaisType::cP),
+            (5, BravaisType::cI),
+            (4, BravaisType::hR),
+            (6, BravaisType::tI),
+            (7, BravaisType::tI),
+            (8, BravaisType::oI),
+            // Second set, A=B
+            (9, BravaisType::hR),
+            (10, BravaisType::mC),
+            (11, BravaisType::tP),
+            (12, BravaisType::hP),
+            (13, BravaisType::oC),
+            (15, BravaisType::tI),
+            (16, BravaisType::oF),
+            (14, BravaisType::mC),
+            (17, BravaisType::mC),
+            // Third set, B=C
+            (18, BravaisType::tI),
+            (19, BravaisType::oI),
+            (20, BravaisType::mC),
+            (21, BravaisType::tP),
+            (22, BravaisType::hP),
+            (23, BravaisType::oC),
+            (24, BravaisType::hR),
+            (25, BravaisType::mC),
+            // Fourth set
+            (26, BravaisType::oF),
+            (27, BravaisType::mC),
+            (28, BravaisType::mC),
+            (29, BravaisType::mC),
+            (30, BravaisType::mC),
+            (31, BravaisType::aP),
+            (32, BravaisType::oP),
+            (40, BravaisType::oC),
+            (35, BravaisType::mP),
+            (36, BravaisType::oC),
+            (33, BravaisType::mP),
+            (38, BravaisType::oC),
+            (34, BravaisType::mP),
+            (42, BravaisType::oI),
+            (41, BravaisType::mC),
+            (37, BravaisType::mC),
+            (39, BravaisType::mC),
+            (43, BravaisType::mI),
+            (44, BravaisType::aP),
         ])
     };
-    // Conventional cell transformation lookup from integer Selling vector
-    pub static ref SELLING_TO_CONV_TRANS: HashMap<Vector6<usize>, Matrix3<isize>> =
+
+    // Conventional cell transformation matrix from lattice character number
+    pub static ref LATTICE_CHAR_TO_CONV_TRANS: HashMap<u8, Matrix3<i8>> = {
         HashMap::from([
-            (
-                Vector6::new(1, 1, 1, 1, 1, 1),
-                Matrix3::new(0, 1, 1, 1, 0, 1, 1, 1, 0)
-            ),
-            (
-                Vector6::new(0, 1, 1, 1, 1, 0),
-                Matrix3::new(1, -1, 1, 1, 1, 1, 0, 0, 2)
-            ),
-            (
-                Vector6::new(0, 0, 1, 1, 1, 0),
-                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
-
-            ),
-            (
-                Vector6::new(0, 0, 1, 0, 1, 1),
-                Matrix3::new(1, 0, 0, 0, 0, 1, 0, 1, 1)
-
-            ),
-            (
-                Vector6::new(1, 0, 1, 0, 1, 2),
-                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
-            ),
-            (
-                Vector6::new(1, 1, 2, 1, 2, 2),
-                Matrix3::new(1, 0, 1, -1, 1, 1, 0, -1, 1)
-            ),
-            (
-                Vector6::new(0, 1, 1, 1, 2, 0),
-                Matrix3::new(1, 0, 1, 0, 0, 3, 0, 1, 2)
-            ),
-            (
-                Vector6::new(1, 2, 2, 2, 2, 1),
-                Matrix3::new(0, 1, 1, 1, 0, 1, 1, 1, 0)
-            ),
-            (
-                Vector6::new(0, 1, 1, 1, 1, 2),
-                Matrix3::new(1, 0, 1, 0, 1, 1, 0, 0, 2)
-            ),
-            (
-                Vector6::new(0, 0, 1, 0, 1, 2),
-                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
-            ),
-            (
-                Vector6::new(0, 0, 1, 1, 2, 0),
-                Matrix3::new(1, 0, 0, 0, 0, 1, 0, 1, 1)
-            ),
-            (
-                Vector6::new(0, 0, 1, 2, 0, 2),
-                Matrix3::new(0, 0, 1, 1, 1, 0, 0, 1, 0)
-            ),
-            (
-                Vector6::new(1, 2, 2, 2, 2, 3),
-                Matrix3::new(1, -1, 1, 1, 1, 1, 0, 0, 2)
-            ),
-            (
-                Vector6::new(1, 2, 3, 3, 2, 1),
-                Matrix3::new(0, 1, 1, 1, 0, 1, 1, 1, 0)
-            ),
-            (
-                Vector6::new(0, 1, 1, 2, 2, 3),
-                Matrix3::new(1, 0, 1, 0, 1, 1, 0, 0, 2)
-            ),
-            (
-                Vector6::new(0, 1, 2, 2, 1, 0),
-                Matrix3::new(0, 1, 1, 1, 0, 1, 1, 1, 0)
-            ),
-            (
-                Vector6::new(0, 1, 1, 2, 2, 0),
-                Matrix3::new(1, 0, 1, 0, 1, 1, 0, 0, 2)
-            ),
-            (
-                Vector6::new(1, 0, 2, 0, 1, 3),
-                Matrix3::new(2, 0, 0, 1, 1, 0, 0, 0, 1)
-            ),
-            (
-                Vector6::new(1, 0, 2, 0, 2, 3),
-                Matrix3::new(1, 1, 0, -1, 1, 0, 0, 0, 1)
-            ),
-            (
-                Vector6::new(0, 0, 1, 0, 2, 3),
-                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
-            ),
-            (
-                Vector6::new(0, 0, 1, 2, 3, 0),
-                Matrix3::new(1, 0, 0, 0, 0, 1, 0, 1, 1)
-            ),
-            (
-                Vector6::new(1, 2, 3, 2, 3, 4),
-                Matrix3::new(-1, 1, 0, -1, -1, 0, -1, 0, 1)
-            ),
-            (
-                Vector6::new(1, 2, 3, 3, 2, 4),
-                Matrix3::new(0, 1, -1, 1, 1, 0, 1, 0, -1)
-            ),
-            (
-                Vector6::new(0, 1, 2, 3, 3, 4),
-                Matrix3::new(-1, 0, 1, -1, 1, 0, -2, 0, 0)
-            ),
-            (
-                Vector6::new(0, 1, 2, 2, 1, 3),
-                Matrix3::new(-1, 1, 0, -1, -1, 0, -1, 0, 1)
-            ),
-            (
-                Vector6::new(0, 1, 2, 1, 2, 3),
-                Matrix3::new(0, 1, -1, 1, 1, 0, 1, 0, -1)
-            ),
-            (
-                Vector6::new(0, 1, 2, 3, 3, 0),
-                Matrix3::new(-1, 0, 1, -1, 1, 0, -2, 0, 0)
-            ),
-            (
-                Vector6::new(0, 1, 2, 3, 1, 0),
-                Matrix3::new(1, 0, -1, 1, -1, 0, 0, -1, -1)
-            ),
-            (
-                Vector6::new(0, 1, 2, 0, 3, 4),
-                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
-            ),
-            (
-                Vector6::new(1, 2, 3, 4, 5, 6),
-                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
-            ),
-            (
-                Vector6::new(0, 1, 2, 3, 4, 5),
-                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
-            ),
-            (
-                Vector6::new(0, 1, 2, 3, 4, 0),
-                Matrix3::new(1, 0, 0, 0, 1, 0, 0, 0, 1)
-            ),
-        ]);
+            // First set, A=B=C
+            (1, Matrix3::new(1,-1,1,1,1,-1,-1,1,1)),
+            (2, Matrix3::new(1,-1,0,-1,0,1,-1,-1,-1)),
+            (3, Matrix3::identity()),
+            (5, Matrix3::new(1,0,1,1,1,0,0,1,1)),
+            (4, Matrix3::new(1,-1,0,-1,0,1,-1,-1,-1)),
+            (6, Matrix3::new(0,1,1,1,0,1,1,1,0)),
+            (7, Matrix3::new(1,0,1,1,1,0,0,1,1)),
+            (8, Matrix3::new(-1,-1,0,-1,0,-1,0,-1,-1)),
+            // Second set, A=B
+            (9, Matrix3::new(1,0,0,-1,1,0,-1,-1,3)),
+            (10, Matrix3::new(1,1,0,1,-1,0,0,0,-1)),
+            (11, Matrix3::identity()),
+            (12, Matrix3::identity()),
+            (13, Matrix3::new(1,1,0,-1,1,0,0,0,1)),
+            (15, Matrix3::new(1,0,0,0,1,0,1,1,2)),
+            (16, Matrix3::new(-1,-1,0,1,-1,0,1,1,2)),
+            (14, Matrix3::new(1,1,0,-1,1,0,0,0,1)),
+            (17, Matrix3::new(1,-1,0,1,1,0,-1,0,-1)),
+            // Third set, B=C
+            (18, Matrix3::new(0,-1,1,1,-1,-1,1,0,0)),
+            (19, Matrix3::new(-1,0,0,0,-1,1,-1,1,1)),
+            (20, Matrix3::new(0,1,1,0,1,-1,-1,0,0)),
+            (21, Matrix3::new(0,1,0,0,0,1,1,0,0)),
+            (22, Matrix3::new(0,1,0,0,0,1,1,0,0)),
+            (23, Matrix3::new(0,1,1,0,-1,1,1,0,0)),
+            (24, Matrix3::new(1,2,1,0,-1,1,1,0,0)),
+            (25, Matrix3::new(0,1,1,0,-1,1,1,0,0)),
+            // Fourth set
+            (26, Matrix3::new(1,0,0,-1,2,0,-1,0,2)),
+            (27, Matrix3::new(-1,2,0,-1,0,0,0,-1,1)),
+            (28, Matrix3::new(-1,0,0,-1,0,2,0,1,0)),
+            (29, Matrix3::new(1,0,0,1,-2,0,0,0,-1)),
+            (30, Matrix3::new(0,1,0,0,1,-2,-1,0,0)),
+            (31, Matrix3::identity()),
+            (32, Matrix3::identity()),
+            (40, Matrix3::new(0,-1,0,0,1,2,-1,0,0)),
+            (35, Matrix3::new(0,-1,0,-1,0,0,0,0,-1)),
+            (36, Matrix3::new(1,0,0,-1,0,-2,0,1,0)),
+            (33, Matrix3::identity()),
+            (38, Matrix3::new(-1,0,0,1,2,0,0,0,-1)),
+            (34, Matrix3::new(-1,0,0,0,0,-1,0,-1,0)),
+            (42, Matrix3::new(-1,0,0,0,-1,0,1,1,2)),
+            (41, Matrix3::new(0,-1,-2,0,-1,0,-1,0,0)),
+            (37, Matrix3::new(1,0,2,1,0,0,0,1,0)),
+            (39, Matrix3::new(-1,-2,0,-1,0,0,0,0,-1)),
+            (43, Matrix3::new(-1,0,0,-1,-1,-2,0,-1,0)),
+            (44, Matrix3::identity()),
+        ])
+    };
 
     // Conventional to primitive cell transformation lookup from centering
     pub static ref CENTERING_TO_PRIM_TRANS: HashMap<String, Matrix4<isize>> =

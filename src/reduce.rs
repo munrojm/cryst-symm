@@ -143,6 +143,13 @@ impl Reducer {
             Vector3::new(1.0, 1.0, 0.0),
             Vector3::new(1.0, 0.0, 1.0),
             Vector3::new(0.0, 1.0, 1.0),
+            Vector3::new(-1.0, 1.0, 0.0),
+            Vector3::new(-1.0, 0.0, 1.0),
+            Vector3::new(0.0, -1.0, 1.0),
+            Vector3::new(1.0, 1.0, 1.0),
+            Vector3::new(-1.0, 1.0, 1.0),
+            Vector3::new(1.0, -1.0, 1.0),
+            Vector3::new(1.0, 1.0, -1.0),
         ];
 
         let mut combination_vecs: Vec<Vector3<f32>> = Vec::new();
@@ -199,6 +206,17 @@ impl Reducer {
 
         let mut prim_structure = Structure::new(new_lattice, new_species, new_frac_coords, false);
         prim_structure.normalize_coords(&self.dtol);
+        println!(
+            "{:?}",
+            (
+                prim_structure.a(),
+                prim_structure.b(),
+                prim_structure.c(),
+                prim_structure.alpha(),
+                prim_structure.beta(),
+                prim_structure.gamma()
+            )
+        );
         return prim_structure;
     }
 
@@ -286,7 +304,7 @@ impl Reducer {
         return new_structure;
     }
 
-    /// Function to get three shortest cartestian translation vectors which still span the lattice.
+    /// Function to get three shortest (right-handed) cartestian translation vectors which still span the lattice.
     fn get_shortest_translation_vecs(
         &self,
         cart_vecs: &mut Vec<Vector3<f32>>,
@@ -301,14 +319,17 @@ impl Reducer {
         for (vec_num, cart_vec) in cart_vecs[1..].iter().enumerate() {
             cross_vec = first.cross(cart_vec);
 
-            if cross_vec.magnitude().abs() > self.dtol {
+            if cross_vec.magnitude() > self.dtol && first.dot(&cart_vec) > self.dtol {
                 second_ind = vec_num + 1;
                 break;
             }
         }
 
         for (vec_num, cart_vec) in cart_vecs[(second_ind + 1)..].iter().enumerate() {
-            if !((cross_vec.dot(cart_vec)).abs() <= self.dtol) {
+            if cross_vec.dot(cart_vec) > self.dtol
+                && cart_vec.dot(&first) > self.dtol
+                && cart_vec.dot(&cart_vecs[second_ind]) > self.dtol
+            {
                 third_ind = vec_num + second_ind + 1;
                 break;
             }
