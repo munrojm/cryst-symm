@@ -21,7 +21,7 @@ impl SymmetryAnalyzer {
         let reducer = Reducer { dtol: self.dtol };
 
         let prim_structure = reducer.find_primitive_cell(structure);
-        let del_prim_structure = reducer.delaunay_reduce(&prim_structure);
+        let del_prim_structure = reducer.delaunay_reduce(&prim_structure, false);
 
         let mut delaunay_mat = del_prim_structure.delaunay_matrix();
 
@@ -57,7 +57,7 @@ impl SymmetryAnalyzer {
         let reducer = Reducer { dtol: self.dtol };
 
         let prim_structure = reducer.find_primitive_cell(structure);
-        let del_prim_structure = reducer.delaunay_reduce(&prim_structure);
+        let del_prim_structure = reducer.delaunay_reduce(&prim_structure, false);
         let mut conv_structure = self.get_standard_conventional_structure(&del_prim_structure);
 
         let mut delaunay_mat = del_prim_structure.delaunay_matrix();
