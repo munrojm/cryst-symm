@@ -1,7 +1,7 @@
 use crate::data::ZERO_TOL;
 use crate::structure::Structure;
 use crate::utils::normalize_frac_vectors;
-use nalgebra::{Matrix3, Matrix3x4, Vector3, Vector4, Vector6};
+use nalgebra::{Matrix3, Matrix3x4, Vector3, Vector6};
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::string::String;
@@ -259,27 +259,19 @@ impl Reducer {
 
         if full_reduction {
             // New lattice vectors are chosen as shortest from {a, b, c, d, a+b, b+c, c+a}
-            let base_vecs: Vec<Vector4<f32>> = vec![
-                Vector4::new(1.0, 0.0, 0.0, 0.0),
-                Vector4::new(0.0, 1.0, 0.0, 0.0),
-                Vector4::new(0.0, 0.0, 1.0, 0.0),
-                Vector4::new(0.0, 0.0, 0.0, 1.0),
-            ];
 
-            let mut combination_vecs: Vec<Vector3<f32>> = Vec::new();
-
-            for base_vec in base_vecs {
-                let transformed_vec = delaunay_mat * base_vec;
-                combination_vecs.push(transformed_vec);
-            }
+            let mut base_vecs: Vec<Vector3<f32>> = delaunay_mat
+                .column_iter()
+                .map(|vec| Vector3::from(vec))
+                .collect();
 
             // Sort quadruple to get three shortest vectors
-            combination_vecs.sort_by(|a, b| a.magnitude().partial_cmp(&b.magnitude()).unwrap());
+            base_vecs.sort_by(|a, b| a.magnitude().partial_cmp(&b.magnitude()).unwrap());
 
-            let mut first = combination_vecs[0];
-            let mut second = combination_vecs[1];
-            let mut third = combination_vecs[2];
-            let fourth = combination_vecs[3];
+            let mut first = base_vecs[0];
+            let mut second = base_vecs[1];
+            let mut third = base_vecs[2];
+            let fourth = base_vecs[3];
 
             let g12 = first.dot(&second);
             let g13 = first.dot(&third);
