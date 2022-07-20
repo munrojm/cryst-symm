@@ -143,6 +143,13 @@ impl Reducer {
             Vector3::new(1.0, 1.0, 0.0),
             Vector3::new(1.0, 0.0, 1.0),
             Vector3::new(0.0, 1.0, 1.0),
+            Vector3::new(-1.0, 1.0, 0.0),
+            Vector3::new(-1.0, 0.0, 1.0),
+            Vector3::new(0.0, -1.0, 1.0),
+            Vector3::new(1.0, 1.0, 1.0),
+            Vector3::new(-1.0, 1.0, 1.0),
+            Vector3::new(1.0, -1.0, 1.0),
+            Vector3::new(1.0, 1.0, -1.0),
         ];
 
         let mut combination_vecs: Vec<Vector3<f32>> = Vec::new();
@@ -248,6 +255,7 @@ impl Reducer {
             delaunay_mat.set_column(pos_pair.1 as usize, &neg_column);
 
             scalar_prods = Self::get_scalar_prods(&delaunay_mat);
+
             count += 1;
         }
 
