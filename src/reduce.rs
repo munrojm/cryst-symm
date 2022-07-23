@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::string::String;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct Reducer {
     pub dtol: f32,
 }

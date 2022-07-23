@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::option::Option;
 use std::string::String;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct SymmetryAnalyzer {
     pub dtol: f32,
 }
