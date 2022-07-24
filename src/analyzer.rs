@@ -12,29 +12,25 @@ pub struct SymmetryAnalyzer {
 
 impl SymmetryAnalyzer {
     /// Obtains the conventional structure
-    ///
-    /// TODO: Make certain cells pretty (e.g. cubic, rh) \
-    /// TODO: Handle Monoclinic transformations from I-centered (monoclinic not working well)
+    /// TODO: Deal with I-centered monoclinc
     pub fn get_standard_conventional_structure(&self, structure: &Structure) -> Structure {
         let reducer = Reducer {
             dtol: self.dtol,
             atol: self.atol,
         };
 
-        let mut reduced_structure = reducer.find_primitive_cell(structure);
-
-        //let mut reduced_structure = reducer.delaunay_reduce(&prim_structure);
+        let prim_structure = reducer.find_primitive_cell(structure);
+        let mut reduced_structure = reducer.niggli_reduce(&prim_structure, &1e-5);
 
         let lattice_character = self.get_lattice_character(&reduced_structure);
-
         let trans_mat = LATTICE_CHAR_TO_CONV_TRANS.get(&lattice_character);
 
         match trans_mat {
             Some(mat) => {
                 let float_mat = Matrix3::from_iterator(mat.iter().map(|&x| x as f32));
-                reduced_structure.apply_transformation(&float_mat, &self.dtol);
+                reduced_structure.apply_transformation(&float_mat.transpose(), &self.dtol);
             }
-            None => panic!("Could not find the appropriate Delaunay transformation matrix!"),
+            None => panic!("Could not find the appropriate conventional transformation matrix!"),
         }
 
         return reduced_structure;
@@ -359,31 +355,4 @@ impl SymmetryAnalyzer {
 
         return vecs;
     }
-
-    // pub fn get_standard_primitive_structure(&self, structure: &Structure) -> Structure {
-    //     let mut conv_structure = self.get_standard_conventional_structure(&structure);
-
-    //     //let bravais_symbol = self.delaunay_to_bravais(&mut delaunay_mat).unwrap();
-
-    //     let full_trans_mat =
-    //         CENTERING_TO_PRIM_TRANS.get(&bravais_symbol.chars().last().unwrap().to_string());
-
-    //     match full_trans_mat {
-    //         Some(mat) => {
-    //             let float_full_trans_mat: Matrix4<f32> =
-    //                 Matrix4::from_iterator(mat.iter().map(|&x| x as f32));
-
-    //             let trans_mat: Matrix3<f32> =
-    //                 Matrix3::from(float_full_trans_mat.fixed_slice::<3, 3>(0, 0))
-    //                     / float_full_trans_mat.m44;
-
-    //             conv_structure.apply_transformation(&trans_mat, &self.dtol);
-
-    //             conv_structure.normalize_coords(&self.dtol);
-    //         }
-    //         None => panic!("Could not find primitive to conventional transformation matrix!"),
-    //     }
-
-    //     return conv_structure;
-    // }
 }

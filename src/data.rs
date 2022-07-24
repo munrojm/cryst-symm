@@ -104,6 +104,9 @@ lazy_static! {
 
     // Conventional cell transformation matrix from lattice character number
     pub static ref LATTICE_CHAR_TO_CONV_TRANS: HashMap<u8, Matrix3<i8>> = {
+        // Note the ITC matrices (T) appear to be such that a transformation of a
+        // lattice matrix (L) is given by:
+        // L' = L * transpose(T)
         HashMap::from([
             // First set, A=B=C
             (1, Matrix3::new(1,-1,1,1,1,-1,-1,1,1)),

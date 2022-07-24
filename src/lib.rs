@@ -59,6 +59,7 @@ fn get_standard_conventional_structure(
     atol: f32,
 ) -> PyResult<(Vec<f32>, Vec<String>, Vec<Vec<f32>>)> {
     let formatted_lattice = Matrix3::from_iterator(lattice.into_iter()); // Lattice needs to be column-major iterator
+
     let formatted_coords: Vec<Vector3<f32>> = coords
         .iter()
         .map(|vec| Vector3::new(vec[0], vec[1], vec[2]))
@@ -77,6 +78,7 @@ fn get_standard_conventional_structure(
     let conv_struct = sa.get_standard_conventional_structure(&structure);
 
     let lattice_vec: Vec<f32> = conv_struct.lattice.iter().map(|x| *x).collect();
+
     let mut coords_vec: Vec<Vec<f32>> = Vec::new();
     for vec in conv_struct.frac_coords.iter() {
         let new_vec: Vec<f32> = vec.iter().map(|x| *x).collect();

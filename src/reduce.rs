@@ -212,7 +212,7 @@ impl Reducer {
     }
 
     /// Produce a new structure which is Niggli reduced
-    /// according to the refined algorithm by Grosse-Kuntsleve et al.
+    /// using the algorithm by Grosse-Kuntsleve et al.
     /// [Acta Cryst. (2004). A60, 1-6](https://doi.org/10.1107/S010876730302186X)
     pub fn niggli_reduce(&self, structure: &Structure, tol: &f32) -> Structure {
         let epsilon = tol * structure.volume().powf(1.0 / 3.0);
@@ -530,7 +530,7 @@ impl Reducer {
         return final_vecs;
     }
 
-    pub fn get_scalar_prods(delaunay_mat: &Matrix3x4<f32>) -> Vector6<f32> {
+    fn get_scalar_prods(delaunay_mat: &Matrix3x4<f32>) -> Vector6<f32> {
         let mut scalar_prods: Vector6<f32> = Vector6::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         let mut ind = 0;
         for i in 0..3 {
