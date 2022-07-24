@@ -1,10 +1,95 @@
 use lazy_static::lazy_static;
 use nalgebra::{Matrix3, Matrix4};
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 use std::string::String;
 
 pub static ZERO_TOL: f32 = 1e-6; // Zero value tolerance
+
+#[derive(PartialEq, Debug, Eq, Hash)]
+pub enum Centering {
+    P,
+    C,
+    I,
+    F,
+    R,
+}
+
+impl Display for Centering {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match &self {
+            Centering::P => write!(f, "P"),
+            Centering::C => write!(f, "C"),
+            Centering::I => write!(f, "I"),
+            Centering::F => write!(f, "F"),
+            Centering::R => write!(f, "R"),
+        }
+    }
+}
+
+impl FromStr for Centering {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input {
+            "P" => Ok(Centering::P),
+            "C" => Ok(Centering::C),
+            "I" => Ok(Centering::I),
+            "F" => Ok(Centering::F),
+            "R" => Ok(Centering::R),
+            _ => Err(()),
+        }
+    }
+}
+
+pub enum LatticeSystem {
+    Triclinic,
+    Monoclinic,
+    Orthorhombic,
+    Tetragonal,
+    Rhombohedral,
+    Hexagonal,
+    Cubic,
+}
+
+impl Display for LatticeSystem {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match &self {
+            LatticeSystem::Triclinic => write!(f, "Triclinic"),
+            LatticeSystem::Monoclinic => write!(f, "Monoclinic"),
+            LatticeSystem::Orthorhombic => write!(f, "Orthorhombic"),
+            LatticeSystem::Tetragonal => write!(f, "Tetragonal"),
+            LatticeSystem::Rhombohedral => write!(f, "Rhombohedral"),
+            LatticeSystem::Hexagonal => write!(f, "Hexagonal"),
+            LatticeSystem::Cubic => write!(f, "Cubic"),
+        }
+    }
+}
+
+impl FromStr for LatticeSystem {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input {
+            "Triclinic" => Ok(LatticeSystem::Triclinic),
+            "Monoclinic" => Ok(LatticeSystem::Monoclinic),
+            "Orthorhombic" => Ok(LatticeSystem::Orthorhombic),
+            "Tetragonal" => Ok(LatticeSystem::Tetragonal),
+            "Rhombohedral" => Ok(LatticeSystem::Rhombohedral),
+            "Hexagonal" => Ok(LatticeSystem::Hexagonal),
+            "Cubic" => Ok(LatticeSystem::Cubic),
+            "a" => Ok(LatticeSystem::Triclinic),
+            "m" => Ok(LatticeSystem::Monoclinic),
+            "o" => Ok(LatticeSystem::Orthorhombic),
+            "t" => Ok(LatticeSystem::Tetragonal),
+            "r" => Ok(LatticeSystem::Rhombohedral),
+            "h" => Ok(LatticeSystem::Hexagonal),
+            "c" => Ok(LatticeSystem::Cubic),
+            _ => Err(()),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 #[allow(non_camel_case_types)]
@@ -27,14 +112,21 @@ pub enum BravaisType {
 }
 
 impl BravaisType {
-    pub fn centering(&self) -> String {
-        let centering: String = self.to_string().chars().last().iter().collect();
-        return centering;
+    pub fn centering(&self) -> Centering {
+        let centering: String = self.to_string().chars().last().unwrap().to_string();
+
+        return Centering::from_str(&centering).unwrap();
+    }
+
+    pub fn lattice_system(&self) -> LatticeSystem {
+        let system: String = self.to_string().chars().nth(0).unwrap().to_string();
+
+        return LatticeSystem::from_str(&system).unwrap();
     }
 }
 
 impl Display for BravaisType {
-    fn fmt(&self, f: &mut Formatter) -> Result {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match &self {
             BravaisType::aP => write!(f, "aP"),
             BravaisType::mP => write!(f, "mP"),
@@ -168,30 +260,26 @@ lazy_static! {
     };
 
     // Conventional to primitive cell transformation lookup from centering
-    pub static ref CENTERING_TO_PRIM_TRANS: HashMap<String, Matrix4<isize>> =
+    pub static ref CENTERING_TO_PRIM_TRANS: HashMap<Centering, Matrix4<isize>> =
     HashMap::from([
         (
-            String::from("P"),
+            Centering::P,
             Matrix4::identity()
         ),
         (
-            String::from("C"),
+            Centering::C,
             Matrix4::new(1, 1, 0, 0, -1, 1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2)
         ),
         (
-            String::from("S"),
-            Matrix4::new(1, 1, 0, 0, -1, 1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2)
-        ),
-        (
-            String::from("I"),
+            Centering::I,
             Matrix4::new(-1, 1, 1, 0, 1, -1, 1, 0, 1, 1, -1, 0, 0, 0, 0, 2)
         ),
         (
-            String::from("F"),
+            Centering::F,
             Matrix4::new(0,1,1,0,1,0,1,0,1,1,0,0,0,0,0,2)
         ),
         (
-            String::from("R"),
+            Centering::R,
             Matrix4::new(-1,2,-1,0,-2,1,1,0,1,1,1,0,0,0,0,3)
         ),
         ]);
