@@ -9,6 +9,7 @@ use std::string::String;
 #[derive(Debug, Clone)]
 pub struct Reducer {
     pub dtol: f32,
+    pub atol: f32,
 }
 
 impl Reducer {
@@ -206,7 +207,207 @@ impl Reducer {
 
         let mut prim_structure = Structure::new(new_lattice, new_species, new_frac_coords, false);
         prim_structure.normalize_coords(&self.dtol);
+
         return prim_structure;
+    }
+
+    /// Produce a new structure which is Niggli reduced
+    /// using the algorithm by Grosse-Kuntsleve et al.
+    /// [Acta Cryst. (2004). A60, 1-6](https://doi.org/10.1107/S010876730302186X)
+    pub fn niggli_reduce(&self, structure: &Structure, tol: &f32) -> Structure {
+        let epsilon = tol * structure.volume().powf(1.0 / 3.0);
+
+        let mut metric_tensor = structure.metric_tensor();
+
+        let mut iteration = 0;
+        let mut transformation: Matrix3<f32> = Matrix3::identity();
+
+        while iteration <= 100 {
+            iteration += 1;
+
+            let (mut a, mut b, mut c, mut xi, mut eta, mut zeta) = (
+                metric_tensor.m11,
+                metric_tensor.m22,
+                metric_tensor.m33,
+                2.0 * metric_tensor.m23,
+                2.0 * metric_tensor.m13,
+                2.0 * metric_tensor.m12,
+            );
+
+            // A1
+            let c1: Matrix3<f32> = Matrix3::new(0.0, -1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, -1.0);
+            if ((a - epsilon) > b)
+                || (!(a < (b - epsilon) || b < (a - epsilon)) && ((xi.abs() - epsilon) > eta.abs()))
+            {
+                metric_tensor = c1.transpose() * metric_tensor * c1;
+                transformation = transformation * c1;
+                (_, b, c, _, eta, zeta) = (
+                    metric_tensor.m11,
+                    metric_tensor.m22,
+                    metric_tensor.m33,
+                    2.0 * metric_tensor.m23,
+                    2.0 * metric_tensor.m13,
+                    2.0 * metric_tensor.m12,
+                );
+            }
+
+            // A2
+            let c2: Matrix3<f32> = Matrix3::new(-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, -1.0, 0.0);
+            if ((b - epsilon) > c)
+                || (!(b < (c - epsilon) || c < (b - epsilon))
+                    && ((eta.abs() - epsilon) > zeta.abs()))
+            {
+                metric_tensor = c2.transpose() * metric_tensor * c2;
+                transformation = transformation * c2;
+            }
+
+            (_, _, _, xi, eta, zeta) = (
+                metric_tensor.m11,
+                metric_tensor.m22,
+                metric_tensor.m33,
+                2.0 * metric_tensor.m23,
+                2.0 * metric_tensor.m13,
+                2.0 * metric_tensor.m12,
+            );
+
+            // A3 + A4
+
+            let num_negative: i32 = [xi, eta, zeta]
+                .iter()
+                .map(|val| return if val < &(-1.0 * epsilon) { 1 } else { 0 })
+                .sum();
+
+            let mut i = 1.0;
+            let mut j = 1.0;
+            let mut k = 1.0;
+
+            if num_negative % 2 == 0 {
+                if xi < -epsilon {
+                    i = -1.0;
+                };
+                if eta < -epsilon {
+                    j = -1.0;
+                };
+                if zeta < -epsilon {
+                    k = -1.0;
+                };
+            } else {
+                let mut p: &mut f32 = &mut 1.0;
+                let mut prod = 1.0;
+
+                if (xi - epsilon) > 0.0 {
+                    i = -1.0;
+                    prod *= -1.0;
+                } else if !(xi < -epsilon) {
+                    p = &mut i
+                };
+
+                if (eta - epsilon) > 0.0 {
+                    j = -1.0;
+                    prod *= -1.0;
+                } else if !(xi < -epsilon) {
+                    p = &mut j
+                };
+
+                if (zeta - epsilon) > 0.0 {
+                    k = -1.0;
+                    prod *= -1.0;
+                } else if !(xi < -epsilon) {
+                    p = &mut k
+                };
+
+                if prod < -epsilon {
+                    *p = -1.0;
+                };
+            };
+
+            let c3_4: Matrix3<f32> = Matrix3::new(i, 0.0, 0.0, 0.0, j, 0.0, 0.0, 0.0, k);
+            metric_tensor = c3_4.transpose() * metric_tensor * c3_4;
+            transformation = transformation * c3_4;
+
+            (a, b, _, xi, eta, zeta) = (
+                metric_tensor.m11,
+                metric_tensor.m22,
+                metric_tensor.m33,
+                2.0 * metric_tensor.m23,
+                2.0 * metric_tensor.m13,
+                2.0 * metric_tensor.m12,
+            );
+
+            // A5
+
+            if ((xi.abs() - epsilon) > b)
+                || (!(xi < (b - epsilon) || b < (xi - epsilon)) && ((zeta - epsilon) > (2.0 * eta)))
+                || (!(xi < (-b - epsilon) || -b < (xi - epsilon)) && (xi < -epsilon))
+            {
+                let c5: Matrix3<f32> =
+                    Matrix3::new(1.0, 0.0, 0.0, 0.0, 1.0, -1.0 * xi.signum(), 0.0, 0.0, 1.0);
+                metric_tensor = c5.transpose() * metric_tensor * c5;
+                transformation = transformation * c5;
+                continue;
+            }
+
+            // A6
+
+            if ((eta.abs() - epsilon) > a)
+                || (!(eta < (a - epsilon) || a < (eta - epsilon))
+                    && ((zeta - epsilon) > (2.0 * xi)))
+                || (!(eta < (-a - epsilon) || -a < (eta - epsilon)) && (zeta < -epsilon))
+            {
+                let c6: Matrix3<f32> =
+                    Matrix3::new(1.0, 0.0, -1.0 * eta.signum(), 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+                metric_tensor = c6.transpose() * metric_tensor * c6;
+                transformation = transformation * c6;
+                continue;
+            }
+
+            // A7
+
+            if ((zeta.abs() - epsilon) > a)
+                || (!(zeta < (a - epsilon) || a < (zeta - epsilon))
+                    && ((eta - epsilon) > (2.0 * xi)))
+                || (!(zeta < (-a - epsilon) || -a < (zeta - epsilon)) && (eta < -epsilon))
+            {
+                let c7: Matrix3<f32> =
+                    Matrix3::new(1.0, -1.0 * zeta.signum(), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+                metric_tensor = c7.transpose() * metric_tensor * c7;
+                transformation = transformation * c7;
+                continue;
+            }
+
+            // A8
+
+            let bool_sum = xi + eta + zeta + a + b;
+
+            if (bool_sum < -epsilon)
+                || (!((bool_sum < -epsilon) || 0.0 < (bool_sum - epsilon))
+                    && ((2.0 * (a + eta) + zeta - epsilon) > 0.0))
+            {
+                let c8: Matrix3<f32> = Matrix3::new(1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0);
+                metric_tensor = c8.transpose() * metric_tensor * c8;
+                transformation = transformation * c8;
+                continue;
+            }
+
+            break;
+        }
+
+        // Construct new structure
+        let new_lattice = structure.lattice * transformation;
+
+        // Does coord folding need to be considered?
+        let new_frac_coords = Structure::get_frac_coords(&new_lattice, &structure.coords);
+
+        let mut new_structure = Structure::new(
+            new_lattice,
+            structure.species.clone(),
+            new_frac_coords,
+            false,
+        );
+
+        new_structure.normalize_coords(&self.dtol);
+
+        return new_structure;
     }
 
     /// Produce a new structure which is Delaunay reduced.
@@ -305,7 +506,7 @@ impl Reducer {
             new_lattice = Matrix3::from(delaunay_mat.fixed_slice::<3, 3>(0, 0));
         }
 
-        // TODO: May need to assume coord folding and eliminate duplicates.
+        // Does coord folding need to be considered?
         let new_frac_coords = Structure::get_frac_coords(&new_lattice, &new_structure.coords);
 
         new_structure = Structure::new(new_lattice, new_structure.species, new_frac_coords, false);
@@ -329,14 +530,17 @@ impl Reducer {
         for (vec_num, cart_vec) in cart_vecs[1..].iter().enumerate() {
             cross_vec = first.cross(cart_vec);
 
-            if cross_vec.magnitude().abs() > self.dtol {
+            if cross_vec.magnitude() > self.dtol && first.dot(&cart_vec) > self.dtol {
                 second_ind = vec_num + 1;
                 break;
             }
         }
 
         for (vec_num, cart_vec) in cart_vecs[(second_ind + 1)..].iter().enumerate() {
-            if cross_vec.dot(cart_vec) > self.dtol {
+            if cross_vec.dot(cart_vec) > self.dtol
+                && cart_vec.dot(&first) > self.dtol
+                && cart_vec.dot(&cart_vecs[second_ind]) > self.dtol
+            {
                 third_ind = vec_num + second_ind + 1;
                 break;
             }
@@ -347,7 +551,7 @@ impl Reducer {
         return final_vecs;
     }
 
-    pub fn get_scalar_prods(delaunay_mat: &Matrix3x4<f32>) -> Vector6<f32> {
+    fn get_scalar_prods(delaunay_mat: &Matrix3x4<f32>) -> Vector6<f32> {
         let mut scalar_prods: Vector6<f32> = Vector6::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         let mut ind = 0;
         for i in 0..3 {
