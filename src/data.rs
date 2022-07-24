@@ -7,6 +7,7 @@ use std::string::String;
 pub static ZERO_TOL: f32 = 1e-6; // Zero value tolerance
 
 #[derive(Debug, Clone, Copy)]
+#[allow(non_camel_case_types)]
 pub enum BravaisType {
     aP,
     mP,
@@ -23,6 +24,13 @@ pub enum BravaisType {
     cP,
     cI,
     cF,
+}
+
+impl BravaisType {
+    pub fn centering(&self) -> String {
+        let centering: String = self.to_string().chars().last().iter().collect();
+        return centering;
+    }
 }
 
 impl Display for BravaisType {

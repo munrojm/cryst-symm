@@ -1,8 +1,10 @@
-use crate::data::{LATTICE_CHAR_TO_CONV_TRANS, ZERO_TOL};
+use crate::data::{
+    CENTERING_TO_PRIM_TRANS, LATTICE_CHAR_TO_BRAVAIS, LATTICE_CHAR_TO_CONV_TRANS, ZERO_TOL,
+};
 use crate::reduce::Reducer;
 use crate::structure::Structure;
 use crate::utils::calculate_dot_uncertainty;
-use nalgebra::{Matrix3, Vector3};
+use nalgebra::{Matrix3, Matrix4, Vector3};
 
 #[derive(Debug, Copy, Clone)]
 pub struct SymmetryAnalyzer {
@@ -11,7 +13,53 @@ pub struct SymmetryAnalyzer {
 }
 
 impl SymmetryAnalyzer {
-    /// Obtains the conventional structure
+    /// Obtains the crystallographic primitive crystal structure
+    pub fn get_standard_primitive_structure(&self, structure: &Structure) -> Structure {
+        let reducer = Reducer {
+            dtol: self.dtol,
+            atol: self.atol,
+        };
+
+        let prim_structure = reducer.find_primitive_cell(structure);
+        let mut reduced_structure = reducer.niggli_reduce(&prim_structure, &1e-5);
+
+        let lattice_character = self.get_lattice_character(&reduced_structure);
+
+        let trans_mat = LATTICE_CHAR_TO_CONV_TRANS.get(&lattice_character);
+
+        match trans_mat {
+            Some(mat) => {
+                let float_mat = Matrix3::from_iterator(mat.iter().map(|&x| x as f32));
+                reduced_structure.apply_transformation(&float_mat.transpose(), &self.dtol);
+            }
+            None => panic!("Could not find the appropriate conventional transformation matrix!"),
+        }
+
+        let bravais_symbol = LATTICE_CHAR_TO_BRAVAIS.get(&lattice_character);
+        match bravais_symbol {
+            Some(symbol) => {
+                let prim_trans_mat = CENTERING_TO_PRIM_TRANS.get(&symbol.centering());
+                match prim_trans_mat {
+                    Some(mat) => {
+                        let float_mat: Matrix4<f32> =
+                            Matrix4::from_iterator(mat.iter().map(|&x| x as f32));
+
+                        let prim_trans_mat: Matrix3<f32> =
+                            Matrix3::from(float_mat.fixed_slice::<3, 3>(0, 0)) / float_mat.m44;
+                        reduced_structure.apply_transformation(&prim_trans_mat, &self.dtol);
+                    }
+                    None => {
+                        panic!("Could not find the appropriate primitive transformation matrix!")
+                    }
+                }
+            }
+            None => panic!("Could not find the appropriate lattice character or bravais symbol!"),
+        }
+
+        return reduced_structure;
+    }
+
+    /// Obtains the crystallographic standard conventional structure
     /// TODO: Deal with I-centered monoclinc
     pub fn get_standard_conventional_structure(&self, structure: &Structure) -> Structure {
         let reducer = Reducer {
