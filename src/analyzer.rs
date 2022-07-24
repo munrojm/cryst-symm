@@ -6,7 +6,7 @@ use crate::structure::Structure;
 use crate::utils::calculate_dot_uncertainty;
 use nalgebra::{Matrix3, Matrix4, Vector3};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct SymmetryAnalyzer {
     pub dtol: f32,
     pub atol: f32,
@@ -21,6 +21,7 @@ impl SymmetryAnalyzer {
         };
 
         let prim_structure = reducer.find_primitive_cell(structure);
+        
         let mut reduced_structure = reducer.niggli_reduce(&prim_structure, &1e-5);
 
         let lattice_character = self.get_lattice_character(&reduced_structure);
