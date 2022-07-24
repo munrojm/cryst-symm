@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use nalgebra::{Matrix3, Matrix4, Vector6};
+use nalgebra::{Matrix3, Matrix4};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter, Result};
 use std::string::String;

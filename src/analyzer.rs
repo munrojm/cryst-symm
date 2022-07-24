@@ -16,24 +16,14 @@ impl SymmetryAnalyzer {
     /// TODO: Make certain cells pretty (e.g. cubic, rh) \
     /// TODO: Handle Monoclinic transformations from I-centered (monoclinic not working well)
     pub fn get_standard_conventional_structure(&self, structure: &Structure) -> Structure {
-        let reducer = Reducer { dtol: self.dtol };
+        let reducer = Reducer {
+            dtol: self.dtol,
+            atol: self.atol,
+        };
 
         let mut reduced_structure = reducer.find_primitive_cell(structure);
 
         //let mut reduced_structure = reducer.delaunay_reduce(&prim_structure);
-        println!("{:?}", reduced_structure.lattice);
-
-        println!(
-            "{:?}",
-            (
-                reduced_structure.a(),
-                reduced_structure.b(),
-                reduced_structure.c(),
-                reduced_structure.alpha(),
-                reduced_structure.beta(),
-                reduced_structure.gamma()
-            )
-        );
 
         let lattice_character = self.get_lattice_character(&reduced_structure);
 
@@ -81,8 +71,6 @@ impl SymmetryAnalyzer {
 
         let mut char_num = 0;
 
-        println!("{:?}", (a, b, c, d, e, f));
-
         let vecs: Vec<(Vector3<f32>, Vector3<f32>, u8)>;
 
         if (a - b).abs() < (da + db) && (a - c).abs() < (da + dc) {
@@ -105,8 +93,6 @@ impl SymmetryAnalyzer {
                 break;
             }
         }
-
-        println!("{:?}", char_num);
 
         if char_num == 14 && Self::extra_eval_a(a, da, b, db, d, dd, e, de, f, df) {
             char_num += 2;

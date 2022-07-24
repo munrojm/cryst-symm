@@ -14,6 +14,7 @@ pub fn normalize_frac_vectors(vecs: &mut Vec<Vector3<f32>>, frac_tols: &Vector3<
     }
 }
 
+///Calculate the uncertainty in the dot product of two vectors.
 pub fn calculate_dot_uncertainty(
     v1: &Vector3<f32>,
     v2: &Vector3<f32>,
