@@ -527,10 +527,7 @@ impl Reducer {
         }
 
         for (vec_num, cart_vec) in cart_vecs[(second_ind + 1)..].iter().enumerate() {
-            if cross_vec.dot(cart_vec) > self.dtol
-                && cart_vec.dot(&first) > self.dtol
-                && cart_vec.dot(&cart_vecs[second_ind]) > self.dtol
-            {
+            if cross_vec.dot(cart_vec) > self.dtol {
                 third_ind = vec_num + second_ind + 1;
                 break;
             }

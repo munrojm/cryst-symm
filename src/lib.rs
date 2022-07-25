@@ -71,6 +71,7 @@ fn get_standard_conventional_structure(
         formatted_coords,
         coords_are_cart,
     );
+
     let sa = SymmetryAnalyzer {
         dtol: dtol,
         atol: atol,
@@ -109,6 +110,7 @@ fn get_standard_primitive_structure(
         formatted_coords,
         coords_are_cart,
     );
+
     let sa = SymmetryAnalyzer {
         dtol: dtol,
         atol: atol,

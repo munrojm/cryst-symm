@@ -270,6 +270,7 @@ impl Structure {
     ) -> Vec<Vector3<f32>> {
         let mut inverted_lattice = Matrix3::identity();
         let mut new_coords = coords.clone();
+
         let inverted = try_invert_to(lattice.clone(), &mut inverted_lattice);
 
         if !inverted {
