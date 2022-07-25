@@ -1,6 +1,6 @@
 use crate::data::ZERO_TOL;
 use crate::structure::Structure;
-use crate::utils::normalize_frac_vectors;
+use crate::utils::{cust_eq, normalize_frac_vectors, num_negative_zero};
 use nalgebra::{Matrix3, Matrix3x4, Vector3, Vector6};
 use std::collections::HashMap;
 use std::iter::FromIterator;
@@ -221,10 +221,6 @@ impl Reducer {
 
         let mut transformation: Matrix3<f32> = Matrix3::identity();
 
-        fn cust_eq(a: f32, b: f32, epsilon: f32) -> bool {
-            return !((a < (b - epsilon)) || (b < (a - epsilon)));
-        }
-
         let (mut a, mut b, mut c, mut xi, mut eta, mut zeta): (f32, f32, f32, f32, f32, f32);
 
         for iteration in 0..101 {
@@ -247,16 +243,16 @@ impl Reducer {
             {
                 metric_tensor = c1.transpose() * metric_tensor * c1;
                 transformation = transformation * c1;
-            }
 
-            (a, b, c, xi, eta, zeta) = (
-                metric_tensor.m11,
-                metric_tensor.m22,
-                metric_tensor.m33,
-                2.0 * metric_tensor.m23,
-                2.0 * metric_tensor.m13,
-                2.0 * metric_tensor.m12,
-            );
+                (_, b, c, xi, eta, zeta) = (
+                    metric_tensor.m11,
+                    metric_tensor.m22,
+                    metric_tensor.m33,
+                    2.0 * metric_tensor.m23,
+                    2.0 * metric_tensor.m13,
+                    2.0 * metric_tensor.m12,
+                );
+            }
 
             // A2
             let c2: Matrix3<f32> = Matrix3::new(-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, -1.0, 0.0);
@@ -270,16 +266,7 @@ impl Reducer {
 
             // A3 + A4
 
-            let mut num_negative = 0;
-            let mut num_zero = 0;
-
-            for val in [xi, eta, zeta] {
-                if val < (-1.0 * epsilon) {
-                    num_negative += 1;
-                } else if val < epsilon {
-                    num_zero += 1;
-                }
-            }
+            let (num_negative, num_zero) = num_negative_zero(&vec![xi, eta, zeta], &epsilon);
 
             let mut i = 1.0;
             let mut j = 1.0;
@@ -329,7 +316,7 @@ impl Reducer {
             metric_tensor = c3_4.transpose() * metric_tensor * c3_4;
             transformation = transformation * c3_4;
 
-            (a, b, c, xi, eta, zeta) = (
+            (a, b, _, xi, eta, zeta) = (
                 metric_tensor.m11,
                 metric_tensor.m22,
                 metric_tensor.m33,
@@ -393,15 +380,6 @@ impl Reducer {
 
             break;
         }
-
-        (a, b, c, xi, eta, zeta) = (
-            metric_tensor.m11,
-            metric_tensor.m22,
-            metric_tensor.m33,
-            2.0 * metric_tensor.m23,
-            2.0 * metric_tensor.m13,
-            2.0 * metric_tensor.m12,
-        );
 
         // Construct new structure
         let new_lattice = structure.lattice * transformation;

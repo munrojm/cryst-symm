@@ -33,3 +33,21 @@ pub fn calculate_dot_uncertainty(
 
     return dd;
 }
+
+pub fn num_negative_zero(vec: &Vec<f32>, epsilon: &f32) -> (i8, i8) {
+    let mut num_negative = 0;
+    let mut num_zero = 0;
+
+    for val in vec {
+        if val < &(-1.0 * epsilon) {
+            num_negative += 1;
+        } else if val < epsilon {
+            num_zero += 1;
+        }
+    }
+    return (num_negative, num_zero);
+}
+
+pub fn cust_eq(a: &f32, b: &f32, epsilon: &f32) -> bool {
+    return !((a < &(b - epsilon)) || (b < &(a - epsilon)));
+}
