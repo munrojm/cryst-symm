@@ -102,8 +102,7 @@ impl Reducer {
                         let cart_coord_delta =
                             Structure::get_cart_coords(&temp_structure.lattice, &coord_delta);
 
-                        if cart_coord_delta.first().unwrap().magnitude().abs() <= (2.0 * self.dtol)
-                        {
+                        if cart_coord_delta[0].magnitude().abs() <= (2.0 * self.dtol) {
                             matched = true;
                             break;
                         }
@@ -160,12 +159,10 @@ impl Reducer {
             combination_vecs.push(transformed_vec);
             combination_vecs.push(-1.0 * transformed_vec);
 
-            for i in 0..3 {
-                let mut new_vec = transformed_vec.clone();
-                new_vec[i] = -1.0 * new_vec[i];
-                if new_vec.magnitude().abs() > ZERO_TOL {
-                    combination_vecs.push(new_vec);
-                }
+            let mut new_vec = transformed_vec.clone();
+            new_vec = -1.0 * new_vec;
+            if new_vec.magnitude().abs() > ZERO_TOL {
+                combination_vecs.push(new_vec);
             }
         }
 
