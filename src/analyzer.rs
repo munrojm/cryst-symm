@@ -126,7 +126,7 @@ impl SymmetryAnalyzer {
         } else if cust_eq(&b, &c, &epsilon) {
             vecs = Self::get_third_set(type_i, a, b, d, e, f, epsilon);
         } else {
-            vecs = Self::get_fourth_set(type_i, a, b, d, e, f, epsilon);
+            vecs = Self::get_fourth_set(type_i, a, b, d, e, f);
         }
 
         for (vec, num) in vecs {
@@ -255,7 +255,6 @@ impl SymmetryAnalyzer {
         d: f32,
         e: f32,
         f: f32,
-        epsilon: f32,
     ) -> Vec<(Vector3<f32>, u8)> {
         let mut vecs = Vec::new();
         if type_i {

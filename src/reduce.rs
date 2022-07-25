@@ -239,7 +239,8 @@ impl Reducer {
 
             // A1
             let c1: Matrix3<f32> = Matrix3::new(0.0, -1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, -1.0);
-            if ((a - epsilon) > b) || (cust_eq(a, b, epsilon) && ((xi.abs() - epsilon) > eta.abs()))
+            if ((a - epsilon) > b)
+                || (cust_eq(&a, &b, &epsilon) && ((xi.abs() - epsilon) > eta.abs()))
             {
                 metric_tensor = c1.transpose() * metric_tensor * c1;
                 transformation = transformation * c1;
@@ -257,7 +258,7 @@ impl Reducer {
             // A2
             let c2: Matrix3<f32> = Matrix3::new(-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, -1.0, 0.0);
             if ((b - epsilon) > c)
-                || ((cust_eq(b, c, epsilon)) && ((eta.abs() - epsilon) > zeta.abs()))
+                || ((cust_eq(&b, &c, &epsilon)) && ((eta.abs() - epsilon) > zeta.abs()))
             {
                 metric_tensor = c2.transpose() * metric_tensor * c2;
                 transformation = transformation * c2;
@@ -328,8 +329,8 @@ impl Reducer {
             // A5
 
             if ((xi.abs() - epsilon) > b)
-                || ((cust_eq(xi, b, epsilon)) && ((zeta - epsilon) > (2.0 * eta)))
-                || ((cust_eq(xi, -1.0 * b, epsilon)) && (zeta < -epsilon))
+                || ((cust_eq(&xi, &b, &epsilon)) && ((zeta - epsilon) > (2.0 * eta)))
+                || ((cust_eq(&xi, &(-1.0 * b), &epsilon)) && (zeta < -epsilon))
             {
                 let c5: Matrix3<f32> =
                     Matrix3::new(1.0, 0.0, 0.0, 0.0, 1.0, -1.0 * xi.signum(), 0.0, 0.0, 1.0);
@@ -341,8 +342,8 @@ impl Reducer {
             // A6
 
             if ((eta.abs() - epsilon) > a)
-                || ((cust_eq(eta, a, epsilon)) && ((zeta - epsilon) > (2.0 * xi)))
-                || ((cust_eq(eta, -1.0 * a, epsilon)) && (zeta < -epsilon))
+                || ((cust_eq(&eta, &a, &epsilon)) && ((zeta - epsilon) > (2.0 * xi)))
+                || ((cust_eq(&eta, &(-1.0 * a), &epsilon)) && (zeta < -epsilon))
             {
                 let c6: Matrix3<f32> =
                     Matrix3::new(1.0, 0.0, -1.0 * eta.signum(), 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
@@ -354,8 +355,8 @@ impl Reducer {
             // A7
 
             if ((zeta.abs() - epsilon) > a)
-                || ((cust_eq(zeta, a, epsilon)) && ((eta - epsilon) > (2.0 * xi)))
-                || ((cust_eq(zeta, -1.0 * a, epsilon)) && (eta < -epsilon))
+                || ((cust_eq(&zeta, &a, &epsilon)) && ((eta - epsilon) > (2.0 * xi)))
+                || ((cust_eq(&zeta, &(-1.0 * a), &epsilon)) && (eta < -epsilon))
             {
                 let c7: Matrix3<f32> =
                     Matrix3::new(1.0, -1.0 * zeta.signum(), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
@@ -369,7 +370,7 @@ impl Reducer {
             let bool_sum = xi + eta + zeta + a + b;
 
             if (bool_sum < -epsilon)
-                || ((cust_eq(bool_sum, 0.0, epsilon))
+                || ((cust_eq(&bool_sum, &0.0, &epsilon))
                     && (((2.0 * (a + eta)) + zeta - epsilon) > 0.0))
             {
                 let c8: Matrix3<f32> = Matrix3::new(1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0);
