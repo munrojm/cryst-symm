@@ -219,13 +219,20 @@ impl Reducer {
 
         let mut metric_tensor = structure.metric_tensor();
 
-        let mut iteration = 0;
         let mut transformation: Matrix3<f32> = Matrix3::identity();
 
-        while iteration <= 100 {
-            iteration += 1;
+        fn cust_eq(a: f32, b: f32, epsilon: f32) -> bool {
+            return !((a < (b - epsilon)) || (b < (a - epsilon)));
+        }
 
-            let (mut a, mut b, mut c, mut xi, mut eta, mut zeta) = (
+        let (mut a, mut b, mut c, mut xi, mut eta, mut zeta): (f32, f32, f32, f32, f32, f32);
+
+        for iteration in 0..101 {
+            if iteration == 100 {
+                panic!("Could not find Niggli reduced structure!")
+            }
+
+            (a, b, c, xi, eta, zeta) = (
                 metric_tensor.m11,
                 metric_tensor.m22,
                 metric_tensor.m33,
@@ -236,32 +243,13 @@ impl Reducer {
 
             // A1
             let c1: Matrix3<f32> = Matrix3::new(0.0, -1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, -1.0);
-            if ((a - epsilon) > b)
-                || (!(a < (b - epsilon) || b < (a - epsilon)) && ((xi.abs() - epsilon) > eta.abs()))
+            if ((a - epsilon) > b) || (cust_eq(a, b, epsilon) && ((xi.abs() - epsilon) > eta.abs()))
             {
                 metric_tensor = c1.transpose() * metric_tensor * c1;
                 transformation = transformation * c1;
-                (_, b, c, _, eta, zeta) = (
-                    metric_tensor.m11,
-                    metric_tensor.m22,
-                    metric_tensor.m33,
-                    2.0 * metric_tensor.m23,
-                    2.0 * metric_tensor.m13,
-                    2.0 * metric_tensor.m12,
-                );
             }
 
-            // A2
-            let c2: Matrix3<f32> = Matrix3::new(-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, -1.0, 0.0);
-            if ((b - epsilon) > c)
-                || (!(b < (c - epsilon) || c < (b - epsilon))
-                    && ((eta.abs() - epsilon) > zeta.abs()))
-            {
-                metric_tensor = c2.transpose() * metric_tensor * c2;
-                transformation = transformation * c2;
-            }
-
-            (_, _, _, xi, eta, zeta) = (
+            (a, b, c, xi, eta, zeta) = (
                 metric_tensor.m11,
                 metric_tensor.m22,
                 metric_tensor.m33,
@@ -270,18 +258,34 @@ impl Reducer {
                 2.0 * metric_tensor.m12,
             );
 
+            // A2
+            let c2: Matrix3<f32> = Matrix3::new(-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, -1.0, 0.0);
+            if ((b - epsilon) > c)
+                || ((cust_eq(b, c, epsilon)) && ((eta.abs() - epsilon) > zeta.abs()))
+            {
+                metric_tensor = c2.transpose() * metric_tensor * c2;
+                transformation = transformation * c2;
+                continue;
+            }
+
             // A3 + A4
 
-            let num_negative: i32 = [xi, eta, zeta]
-                .iter()
-                .map(|val| return if val < &(-1.0 * epsilon) { 1 } else { 0 })
-                .sum();
+            let mut num_negative = 0;
+            let mut num_zero = 0;
+
+            for val in [xi, eta, zeta] {
+                if val < (-1.0 * epsilon) {
+                    num_negative += 1;
+                } else if val < epsilon {
+                    num_zero += 1;
+                }
+            }
 
             let mut i = 1.0;
             let mut j = 1.0;
             let mut k = 1.0;
 
-            if num_negative % 2 == 0 {
+            if (num_negative % 2 == 0) && (num_zero == 0) {
                 if xi < -epsilon {
                     i = -1.0;
                 };
@@ -305,14 +309,14 @@ impl Reducer {
                 if (eta - epsilon) > 0.0 {
                     j = -1.0;
                     prod *= -1.0;
-                } else if !(xi < -epsilon) {
+                } else if !(eta < -epsilon) {
                     p = &mut j
                 };
 
                 if (zeta - epsilon) > 0.0 {
                     k = -1.0;
                     prod *= -1.0;
-                } else if !(xi < -epsilon) {
+                } else if !(zeta < -epsilon) {
                     p = &mut k
                 };
 
@@ -325,7 +329,7 @@ impl Reducer {
             metric_tensor = c3_4.transpose() * metric_tensor * c3_4;
             transformation = transformation * c3_4;
 
-            (a, b, _, xi, eta, zeta) = (
+            (a, b, c, xi, eta, zeta) = (
                 metric_tensor.m11,
                 metric_tensor.m22,
                 metric_tensor.m33,
@@ -337,8 +341,8 @@ impl Reducer {
             // A5
 
             if ((xi.abs() - epsilon) > b)
-                || (!(xi < (b - epsilon) || b < (xi - epsilon)) && ((zeta - epsilon) > (2.0 * eta)))
-                || (!(xi < (-b - epsilon) || -b < (xi - epsilon)) && (xi < -epsilon))
+                || ((cust_eq(xi, b, epsilon)) && ((zeta - epsilon) > (2.0 * eta)))
+                || ((cust_eq(xi, -1.0 * b, epsilon)) && (zeta < -epsilon))
             {
                 let c5: Matrix3<f32> =
                     Matrix3::new(1.0, 0.0, 0.0, 0.0, 1.0, -1.0 * xi.signum(), 0.0, 0.0, 1.0);
@@ -350,9 +354,8 @@ impl Reducer {
             // A6
 
             if ((eta.abs() - epsilon) > a)
-                || (!(eta < (a - epsilon) || a < (eta - epsilon))
-                    && ((zeta - epsilon) > (2.0 * xi)))
-                || (!(eta < (-a - epsilon) || -a < (eta - epsilon)) && (zeta < -epsilon))
+                || ((cust_eq(eta, a, epsilon)) && ((zeta - epsilon) > (2.0 * xi)))
+                || ((cust_eq(eta, -1.0 * a, epsilon)) && (zeta < -epsilon))
             {
                 let c6: Matrix3<f32> =
                     Matrix3::new(1.0, 0.0, -1.0 * eta.signum(), 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
@@ -364,9 +367,8 @@ impl Reducer {
             // A7
 
             if ((zeta.abs() - epsilon) > a)
-                || (!(zeta < (a - epsilon) || a < (zeta - epsilon))
-                    && ((eta - epsilon) > (2.0 * xi)))
-                || (!(zeta < (-a - epsilon) || -a < (zeta - epsilon)) && (eta < -epsilon))
+                || ((cust_eq(zeta, a, epsilon)) && ((eta - epsilon) > (2.0 * xi)))
+                || ((cust_eq(zeta, -1.0 * a, epsilon)) && (eta < -epsilon))
             {
                 let c7: Matrix3<f32> =
                     Matrix3::new(1.0, -1.0 * zeta.signum(), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
@@ -380,8 +382,8 @@ impl Reducer {
             let bool_sum = xi + eta + zeta + a + b;
 
             if (bool_sum < -epsilon)
-                || (!((bool_sum < -epsilon) || 0.0 < (bool_sum - epsilon))
-                    && ((2.0 * (a + eta) + zeta - epsilon) > 0.0))
+                || ((cust_eq(bool_sum, 0.0, epsilon))
+                    && (((2.0 * (a + eta)) + zeta - epsilon) > 0.0))
             {
                 let c8: Matrix3<f32> = Matrix3::new(1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0);
                 metric_tensor = c8.transpose() * metric_tensor * c8;
@@ -391,6 +393,15 @@ impl Reducer {
 
             break;
         }
+
+        (a, b, c, xi, eta, zeta) = (
+            metric_tensor.m11,
+            metric_tensor.m22,
+            metric_tensor.m33,
+            2.0 * metric_tensor.m23,
+            2.0 * metric_tensor.m13,
+            2.0 * metric_tensor.m12,
+        );
 
         // Construct new structure
         let new_lattice = structure.lattice * transformation;
