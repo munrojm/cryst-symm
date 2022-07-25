@@ -21,7 +21,7 @@ impl Reducer {
     /// 4. Create new structure and fold atomic sites into new smaller cell.
     ///
     pub fn find_primitive_cell(&self, structure: &Structure) -> Structure {
-        let temp_structure = structure.clone();
+        let mut temp_structure = structure.clone();
         let frac_tols = Vector3::from_iterator(
             temp_structure
                 .lattice
@@ -52,11 +52,11 @@ impl Reducer {
             .0
             .clone();
         //
-        // 2.) Shift origin to first atom of min_ele type and normalize coords (not needed)
+        // 2.) Shift origin to first atom of min_ele type and normalize coords
         //
-        // let new_origin = temp_structure.frac_coords[*ele_inds.get(&min_ele).unwrap() as usize];
-        // temp_structure.set_origin(new_origin);
-        // temp_structure.normalize_coords(&self.dtol);
+        let new_origin = temp_structure.frac_coords[*ele_inds.get(&min_ele).unwrap() as usize];
+        temp_structure.set_origin(new_origin);
+        temp_structure.normalize_coords(&self.dtol);
 
         //
         // 3.) Get all potential new unit translation lattice vectors
@@ -163,7 +163,9 @@ impl Reducer {
             for i in 0..3 {
                 let mut new_vec = transformed_vec.clone();
                 new_vec[i] = -1.0 * new_vec[i];
-                combination_vecs.push(new_vec);
+                if new_vec.magnitude().abs() > ZERO_TOL {
+                    combination_vecs.push(new_vec);
+                }
             }
         }
 
