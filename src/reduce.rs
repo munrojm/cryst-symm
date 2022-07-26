@@ -1,4 +1,4 @@
-use crate::data::ZERO_TOL;
+use crate::data::core::ZERO_TOL;
 use crate::structure::Structure;
 use crate::utils::{cust_eq, normalize_frac_vectors, num_negative_zero};
 use nalgebra::{Matrix3, Matrix3x4, Vector3, Vector6};

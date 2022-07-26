@@ -1,4 +1,6 @@
-use crate::data::{CENTERING_TO_PRIM_TRANS, LATTICE_CHAR_TO_BRAVAIS, LATTICE_CHAR_TO_CONV_TRANS};
+use crate::data::core::{
+    CENTERING_TO_PRIM_TRANS, LATTICE_CHAR_TO_BRAVAIS, LATTICE_CHAR_TO_CONV_TRANS,
+};
 use crate::reduce::Reducer;
 use crate::structure::Structure;
 use crate::utils::{cust_eq, num_negative_zero};
@@ -93,15 +95,11 @@ impl SymmetryAnalyzer {
         let c_vec = Vector3::from(reduced_structure.lattice.column(2));
 
         let a = a_vec.magnitude_squared();
-
         let b = b_vec.magnitude_squared();
-
         let c = c_vec.magnitude_squared();
 
         let d = b_vec.dot(&c_vec);
-
         let e = a_vec.dot(&c_vec);
-
         let f = a_vec.dot(&b_vec);
 
         // Count negatives to avoid floating point multiplication
