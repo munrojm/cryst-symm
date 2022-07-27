@@ -1,4 +1,7 @@
 use crate::data::core::BravaisType;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::string::String;
 
 // {'-1': [3198],
 // '-3': [3198, 7817],
@@ -35,40 +38,40 @@ use crate::data::core::BravaisType;
 
 lazy_static! {
     // International point group symbol from number
-    pub static ref PG_NUM_TO_SYMBOL: HashMap<u8, &str> = {
+    pub static ref PG_NUM_TO_SYMBOL: HashMap<u8, String> = {
         HashMap::from([
-            (1, "1"),
-            (2, "-1"),
-            (3, "-3"),
-            (4, "-3m"),
-            (5, "-4"),
-            (6, "-42m"),
-            (7, "-43m"),
-            (8, "-6"),
-            (9, "-6m2"),
-            (11, "2"),
-            (12, "2/m"),
-            (13, "222"),
-            (14, "23"),
-            (15, "3"),
-            (16, "32"),
-            (17, "3m"),
-            (18, "4"),
-            (19, "4/m"),
-            (20, "4/mmm"),
-            (21, "422"),
-            (22, "432"),
-            (23, "4mm"),
-            (24, "6"),
-            (25, "6/m"),
-            (26, "6/mmm"),
-            (27, "622"),
-            (28, "6mm"),
-            (29, "m"),
-            (30, "m-3"),
-            (31, "m-3m"),
-            (32, "mm2"),
-            (33, "mmm")
+            (1, "1".to_string()),
+            (2, "-1".to_string()),
+            (3, "-3".to_string()),
+            (4, "-3m".to_string()),
+            (5, "-4".to_string()),
+            (6, "-42m".to_string()),
+            (7, "-43m".to_string()),
+            (8, "-6".to_string()),
+            (9, "-6m2".to_string()),
+            (11, "2".to_string()),
+            (12, "2/m".to_string()),
+            (13, "222".to_string()),
+            (14, "23".to_string()),
+            (15, "3".to_string()),
+            (16, "32".to_string()),
+            (17, "3m".to_string()),
+            (18, "4".to_string()),
+            (19, "4/m".to_string()),
+            (20, "4/mmm".to_string()),
+            (21, "422".to_string()),
+            (22, "432".to_string()),
+            (23, "4mm".to_string()),
+            (24, "6".to_string()),
+            (25, "6/m".to_string()),
+            (26, "6/mmm".to_string()),
+            (27, "622".to_string()),
+            (28, "6mm".to_string()),
+            (29, "m".to_string()),
+            (30, "m-3".to_string()),
+            (31, "m-3m".to_string()),
+            (32, "mm2".to_string()),
+            (33, "mmm".to_string()),
         ])
     };
 
@@ -94,7 +97,7 @@ lazy_static! {
     };
 
     // Encoded point group generator lookup from number
-    pub static ref BRAVAIS_TO_HOLOHEDRY: HashMap<u8, Vec<u16> = {
+    pub static ref PG_NUM_TO_HOLOHEDRY: HashMap<u8, Vec<u16>> = {
         HashMap::from([
             (1, Vec::from([3198])),
             (2, Vec::from([3198, 7817])),
