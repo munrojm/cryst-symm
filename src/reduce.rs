@@ -32,16 +32,16 @@ impl Reducer {
         //
         // 1.) Find atom type with the fewest sites
         //
-        let mut type_count: HashMap<&String, u8> = HashMap::new();
-        let mut ele_inds: HashMap<&String, u8> = HashMap::new();
+        let mut type_count: HashMap<&String, u16> = HashMap::new();
+        let mut ele_inds: HashMap<&String, u16> = HashMap::new();
 
         for (ele_ind, ele) in structure.species.iter().enumerate() {
             *type_count.entry(ele).or_insert(0) += 1;
-            ele_inds.entry(ele).or_insert(ele_ind as u8);
+            ele_inds.entry(ele).or_insert(ele_ind as u16);
         }
 
         // Sorting ensures determinism when getting min
-        let mut sorted_pairs: Vec<(&String, u8)> = Vec::from_iter(type_count.into_iter());
+        let mut sorted_pairs: Vec<(&String, u16)> = Vec::from_iter(type_count.into_iter());
 
         sorted_pairs.sort_by(|a, b| a.0.cmp(b.0));
 
