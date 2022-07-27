@@ -91,7 +91,7 @@ impl FromStr for LatticeSystem {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(PartialEq, Debug, Eq, Hash)]
 #[allow(non_camel_case_types)]
 pub enum BravaisType {
     aP,
