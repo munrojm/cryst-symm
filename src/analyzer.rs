@@ -1,9 +1,11 @@
 use crate::data::core::{
     CENTERING_TO_PRIM_TRANS, LATTICE_CHAR_TO_BRAVAIS, LATTICE_CHAR_TO_CONV_TRANS,
 };
+use crate::data::pointgroup::BRAVAIS_TO_HOLOHEDRY_NUM;
+use crate::pointgroup::PointGroup;
 use crate::reduce::Reducer;
 use crate::structure::Structure;
-use crate::utils::{cust_eq, num_negative_zero};
+use crate::utils::{compare_matrices, cust_eq, num_negative_zero};
 use nalgebra::{Matrix3, Matrix4, Vector3};
 
 #[derive(Debug, Clone)]
@@ -13,6 +15,45 @@ pub struct SymmetryAnalyzer {
 }
 
 impl SymmetryAnalyzer {
+    pub fn get_point_group_operations(&self, structure: &Structure) -> Vec<Matrix3<i8>> {
+        let reducer = Reducer {
+            dtol: self.dtol,
+            atol: self.atol,
+        };
+
+        let prim_structure = reducer.find_primitive_cell(structure);
+
+        let reduced_structure = reducer.niggli_reduce(&prim_structure, &1e-5);
+
+        let lattice_character = self.get_lattice_character(&reduced_structure, &1e-5);
+
+        let bravais_symbol = LATTICE_CHAR_TO_BRAVAIS.get(&lattice_character);
+
+        match bravais_symbol {
+            Some(symbol) => {
+                let holohedry_num = BRAVAIS_TO_HOLOHEDRY_NUM.get(&symbol).unwrap();
+                let holohedry_pg = PointGroup::from_number(holohedry_num);
+
+                let mut pg_ops: Vec<Matrix3<i8>> = Vec::new();
+                let metric_tensor = structure.metric_tensor().clone();
+
+                let tols: Vec<f32> = (0..9).map(|_| self.dtol).collect();
+
+                for op in holohedry_pg.operations {
+                    let float_op = Matrix3::from_iterator(op.iter().map(|&x| x as f32));
+                    let transformed_metric_tensor = float_op.transpose() * metric_tensor * float_op;
+
+                    if compare_matrices(&transformed_metric_tensor, &metric_tensor, &tols) {
+                        pg_ops.push(op);
+                    }
+                }
+
+                return pg_ops;
+            }
+            None => panic!("Could not find the appropriate lattice character or bravais symbol!"),
+        }
+    }
+
     /// Obtains the crystallographic primitive crystal structure
     pub fn get_standard_primitive_structure(&self, structure: &Structure) -> Structure {
         let reducer = Reducer {

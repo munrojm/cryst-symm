@@ -1,6 +1,7 @@
-use nalgebra::Vector3;
+use nalgebra::{Matrix3, Vector3};
 use std::f32::consts::PI;
 
+///Normalizes fraction vectors components such that they are within `(-frac_tol, 1-frac_tol)`
 pub fn normalize_frac_vectors(vecs: &mut Vec<Vector3<f32>>, frac_tols: &Vector3<f32>) {
     for vec in vecs {
         for i in 0..3 {
@@ -34,6 +35,7 @@ pub fn calculate_dot_uncertainty(
     return dd;
 }
 
+///Count the number of negative or zero components in a vector within a tolerance `epsilon`
 pub fn num_negative_zero(vec: &Vec<f32>, epsilon: &f32) -> (i8, i8) {
     let mut num_negative = 0;
     let mut num_zero = 0;
@@ -48,6 +50,31 @@ pub fn num_negative_zero(vec: &Vec<f32>, epsilon: &f32) -> (i8, i8) {
     return (num_negative, num_zero);
 }
 
+///Custom equals evaluation to avoid floating point operations
 pub fn cust_eq(a: &f32, b: &f32, epsilon: &f32) -> bool {
     return !((a < &(b - epsilon)) || (b < &(a - epsilon)));
+}
+
+/// Decode a vector of integers which encoded in a particular base.
+/// Outputs data into the vector passed to `out`.
+pub fn decode(e: u16, base: u8, sub: i8, len: i8) -> Vec<i8> {
+    let mut out: Vec<i8> = Vec::new();
+    let mut new_e = e.clone();
+    for _ in 0..len {
+        out.insert(0, (new_e % base as u16) as i8 - sub);
+        new_e /= base as u16
+    }
+    return out;
+}
+
+/// Function to compare two float rotation matrices element-wise with some tolerance
+/// defined for each entry.
+pub fn compare_matrices(a: &Matrix3<f32>, b: &Matrix3<f32>, tols: &Vec<f32>) -> bool {
+    for n in 0..9 {
+        if !cust_eq(&a[n], &b[n], &tols[n]) {
+            return false;
+        }
+    }
+
+    return true;
 }

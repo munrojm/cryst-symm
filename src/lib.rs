@@ -1,5 +1,6 @@
 pub mod analyzer;
 pub mod data;
+pub mod pointgroup;
 pub mod reduce;
 pub mod structure;
 pub mod utils;
@@ -47,6 +48,43 @@ fn niggli_reduce(
         coords_vec.push(new_vec);
     }
     Ok((lattice_vec, niggli_structure.species, coords_vec))
+}
+
+#[pyfunction]
+fn get_point_group_operations(
+    lattice: Vec<f32>,
+    species: Vec<String>,
+    coords: Vec<Vec<f32>>,
+    coords_are_cart: bool,
+    dtol: f32,
+    atol: f32,
+) -> PyResult<Vec<Vec<i8>>> {
+    let formatted_lattice = Matrix3::from_iterator(lattice.into_iter()); // Lattice needs to be column-major iterator
+    let formatted_coords: Vec<Vector3<f32>> = coords
+        .iter()
+        .map(|vec| Vector3::new(vec[0], vec[1], vec[2]))
+        .collect();
+
+    let structure = Structure::new(
+        formatted_lattice,
+        species,
+        formatted_coords,
+        coords_are_cart,
+    );
+    let sa = SymmetryAnalyzer {
+        dtol: dtol,
+        atol: atol,
+    };
+
+    let point_group = sa.get_point_group_operations(&structure);
+
+    let mut vec_list: Vec<Vec<i8>> = Vec::new();
+    for mat in point_group.iter() {
+        let list: Vec<i8> = mat.transpose().iter().map(|x| *x).collect();
+        vec_list.push(list);
+    }
+
+    Ok(vec_list)
 }
 
 #[pyfunction]
@@ -135,5 +173,7 @@ fn crystsymm(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(niggli_reduce, m)?)?;
     m.add_function(wrap_pyfunction!(get_standard_conventional_structure, m)?)?;
     m.add_function(wrap_pyfunction!(get_standard_primitive_structure, m)?)?;
+    m.add_function(wrap_pyfunction!(get_point_group_operations, m)?)?;
+
     Ok(())
 }
