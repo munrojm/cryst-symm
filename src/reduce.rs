@@ -29,13 +29,16 @@ impl Reducer {
                 .map(|col| self.dtol / col.magnitude()),
         );
 
+        temp_structure.normalize_coords(&self.dtol);
+
         //
         // 1.) Find atom type with the fewest sites
         //
         let mut type_count: HashMap<&String, u16> = HashMap::new();
         let mut ele_inds: HashMap<&String, u16> = HashMap::new();
+        let temp_ele = temp_structure.species.clone();
 
-        for (ele_ind, ele) in structure.species.iter().enumerate() {
+        for (ele_ind, ele) in temp_ele.iter().enumerate() {
             *type_count.entry(ele).or_insert(0) += 1;
             ele_inds.entry(ele).or_insert(ele_ind as u16);
         }
@@ -51,12 +54,13 @@ impl Reducer {
             .unwrap()
             .0
             .clone();
+
         //
         // 2.) Shift origin to first atom of min_ele type and normalize coords
         //
+
         let new_origin = temp_structure.frac_coords[*ele_inds.get(&min_ele).unwrap() as usize];
         temp_structure.set_origin(new_origin);
-        temp_structure.normalize_coords(&self.dtol);
 
         //
         // 3.) Get all potential new unit translation lattice vectors
@@ -73,7 +77,9 @@ impl Reducer {
             if (&temp_structure.species[coord_ind] == min_ele)
                 && (coord_ind != *ele_inds.get(min_ele).unwrap() as usize)
             {
-                candidate_vecs.push(coord - &base_site);
+                let mut frac_diff = vec![coord - &base_site];
+                normalize_frac_vectors(&mut frac_diff, &frac_tols);
+                candidate_vecs.push(frac_diff[0]);
             }
         }
 
@@ -97,7 +103,7 @@ impl Reducer {
                 {
                     if specie == specie_p {
                         let mut coord_delta = vec![tr_coord - coord_p];
-                        normalize_frac_vectors(&mut coord_delta, &(2.0 * &frac_tols));
+                        normalize_frac_vectors(&mut coord_delta, &frac_tols);
 
                         let cart_coord_delta =
                             Structure::get_cart_coords(&temp_structure.lattice, &coord_delta);
@@ -519,7 +525,7 @@ impl Reducer {
         for (vec_num, cart_vec) in cart_vecs[1..].iter().enumerate() {
             cross_vec = first.cross(cart_vec);
 
-            if cross_vec.magnitude() > self.dtol && first.dot(&cart_vec) > self.dtol {
+            if cross_vec.magnitude().abs() > self.dtol {
                 second_ind = vec_num + 1;
                 break;
             }
