@@ -1,7 +1,3 @@
-// PointGroup struct
-// pub fn from_number
-// fn generate_operations(generators)
-// symbol, operations
 use crate::data::pointgroup::{PG_NUM_TO_GENERATOR_MATRICES, PG_NUM_TO_SYMBOL};
 use crate::utils::decode;
 use itertools::iproduct;
