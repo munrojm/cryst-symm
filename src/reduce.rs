@@ -21,6 +21,7 @@ impl Reducer {
     ///
     pub fn find_primitive_cell(&self, structure: &Structure) -> Structure {
         let mut temp_structure = structure.clone();
+
         let frac_tols = Vector3::from_iterator(
             temp_structure
                 .lattice
@@ -34,7 +35,7 @@ impl Reducer {
         // 1.) Find atom type with the fewest sites
         //
 
-        let (min_ele, ele_inds, _) = temp_structure.get_min_element();
+        let (min_ele, ele_inds, ele_counts) = temp_structure.get_min_element();
 
         //
         // 2.) Shift origin to first atom of min_ele type and normalize coords
@@ -168,9 +169,10 @@ impl Reducer {
         let temp_frac_coords = Structure::get_frac_coords(&new_lattice, &temp_structure.coords);
 
         let mut new_frac_coords: Vec<Vector3<f64>> = Vec::new();
+
         let mut new_species: Vec<String> = Vec::new();
 
-        for (coord, specie) in temp_frac_coords.iter().zip(&structure.species) {
+        for (coord, specie) in temp_frac_coords.iter().zip(&temp_structure.species) {
             let mut eq = false;
             for new_coord in new_frac_coords.iter() {
                 let mut coord_diff = vec![coord - new_coord];

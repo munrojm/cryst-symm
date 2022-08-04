@@ -239,6 +239,7 @@ impl SymmetryAnalyzer {
         };
 
         let prim_structure = reducer.find_primitive_cell(structure);
+
         let mut reduced_structure = reducer.niggli_reduce(&prim_structure, &1e-5);
 
         let lattice_character = self.get_lattice_character(&reduced_structure, &1e-5);
