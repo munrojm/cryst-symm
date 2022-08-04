@@ -5,11 +5,14 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::string::String;
 
-pub static ZERO_TOL: f32 = 1e-6; // Zero value tolerance
+pub static ZERO_TOL: f64 = 1e-6; // Zero value tolerance
+pub static INT_CONVERSION_MULT: f64 = 1e9; // Multiplication number to use in float to int rounding
 
 #[derive(PartialEq, Debug, Eq, Hash)]
 pub enum Centering {
     P,
+    A,
+    B,
     C,
     I,
     F,
@@ -20,6 +23,8 @@ impl Display for Centering {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match &self {
             Centering::P => write!(f, "P"),
+            Centering::A => write!(f, "A"),
+            Centering::B => write!(f, "B"),
             Centering::C => write!(f, "C"),
             Centering::I => write!(f, "I"),
             Centering::F => write!(f, "F"),
@@ -34,6 +39,8 @@ impl FromStr for Centering {
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         match input {
             "P" => Ok(Centering::P),
+            "A" => Ok(Centering::A),
+            "B" => Ok(Centering::B),
             "C" => Ok(Centering::C),
             "I" => Ok(Centering::I),
             "F" => Ok(Centering::F),
@@ -267,6 +274,14 @@ lazy_static! {
             Matrix4::identity()
         ),
         (
+            Centering::A,
+            Matrix4::new(2, 0, 0, 0, 0, 1, -1, 0, 0, 1, 1, 0, 0, 0, 0, 2)
+        ),
+        (
+            Centering::B,
+            Matrix4::new(1, 0, -1, 0, 0, 2, 0, 0, 1, 0, 1, 0, 0, 0, 0, 2)
+        ),
+        (
             Centering::C,
             Matrix4::new(1, 1, 0, 0, -1, 1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2)
         ),
@@ -276,11 +291,12 @@ lazy_static! {
         ),
         (
             Centering::F,
-            Matrix4::new(0,1,1,0,1,0,1,0,1,1,0,0,0,0,0,2)
+            Matrix4::new(0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 2)
         ),
         (
             Centering::R,
-            Matrix4::new(-1,2,-1,0,-2,1,1,0,1,1,1,0,0,0,0,3)
+            Matrix4::new(2, -1, -1, 0, 1 ,1 , -2, 0, 1, 1, 1, 0, 0, 0, 0, 3)
+
         ),
         ]);
 }

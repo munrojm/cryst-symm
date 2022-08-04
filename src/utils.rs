@@ -1,8 +1,8 @@
 use nalgebra::{Matrix3, Vector3};
-use std::f32::consts::PI;
+use std::f64::consts::PI;
 
 ///Normalizes fraction vectors components such that they are within `(-frac_tol, 1-frac_tol)`
-pub fn normalize_frac_vectors(vecs: &mut Vec<Vector3<f32>>, frac_tols: &Vector3<f32>) {
+pub fn normalize_frac_vectors(vecs: &mut Vec<Vector3<f64>>, frac_tols: &Vector3<f64>) {
     for vec in vecs {
         for i in 0..3 {
             vec[i] = vec[i] % 1.0;
@@ -17,12 +17,12 @@ pub fn normalize_frac_vectors(vecs: &mut Vec<Vector3<f32>>, frac_tols: &Vector3<
 
 ///Calculate the uncertainty in the dot product of two vectors.
 pub fn calculate_dot_uncertainty(
-    v1: &Vector3<f32>,
-    v2: &Vector3<f32>,
-    dv1: &f32,
-    dv2: &f32,
-    dtheta: &f32,
-) -> f32 {
+    v1: &Vector3<f64>,
+    v2: &Vector3<f64>,
+    dv1: &f64,
+    dv2: &f64,
+    dtheta: &f64,
+) -> f64 {
     let v1_norm = v1.magnitude();
     let v2_norm = v2.magnitude();
     let theta = (v1.dot(v2) / (v1_norm * v2_norm)).acos();
@@ -36,7 +36,7 @@ pub fn calculate_dot_uncertainty(
 }
 
 ///Count the number of negative or zero components in a vector within a tolerance `epsilon`
-pub fn num_negative_zero(vec: &Vec<f32>, epsilon: &f32) -> (i8, i8) {
+pub fn num_negative_zero(vec: &Vec<f64>, epsilon: &f64) -> (i8, i8) {
     let mut num_negative = 0;
     let mut num_zero = 0;
 
@@ -51,7 +51,7 @@ pub fn num_negative_zero(vec: &Vec<f32>, epsilon: &f32) -> (i8, i8) {
 }
 
 ///Custom equals evaluation to avoid floating point operations
-pub fn cust_eq(a: &f32, b: &f32, epsilon: &f32) -> bool {
+pub fn cust_eq(a: &f64, b: &f64, epsilon: &f64) -> bool {
     return !((a < &(b - epsilon)) || (b < &(a - epsilon)));
 }
 
@@ -69,7 +69,7 @@ pub fn decode(e: u16, base: u8, sub: i8, len: i8) -> Vec<i8> {
 
 /// Function to compare two float rotation matrices element-wise with some tolerance
 /// defined for each entry.
-pub fn compare_matrices(a: &Matrix3<f32>, b: &Matrix3<f32>, tols: &Vec<f32>) -> bool {
+pub fn compare_matrices(a: &Matrix3<f64>, b: &Matrix3<f64>, tols: &Vec<f64>) -> bool {
     for n in 0..9 {
         if !cust_eq(&a[n], &b[n], &tols[n]) {
             return false;

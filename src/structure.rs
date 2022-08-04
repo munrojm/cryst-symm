@@ -2,16 +2,17 @@ use crate::utils::normalize_frac_vectors;
 use itertools::izip;
 use nalgebra::{try_invert_to, Matrix3, Matrix3x4, Vector3};
 use std::collections::HashMap;
-use std::f32::consts::PI;
+use std::f64::consts::PI;
+use std::iter::FromIterator;
 use std::string::String;
 
 #[derive(Debug, Clone)]
 ///Representation of a periodic unit cell of a crystal structure.
 pub struct Structure {
-    pub lattice: Matrix3<f32>,
+    pub lattice: Matrix3<f64>,
     pub species: Vec<String>,
-    pub coords: Vec<Vector3<f32>>,
-    pub frac_coords: Vec<Vector3<f32>>,
+    pub coords: Vec<Vector3<f64>>,
+    pub frac_coords: Vec<Vector3<f64>>,
 }
 
 impl Structure {
@@ -47,13 +48,13 @@ impl Structure {
     /// let s = Structure::new(lattice, species, coords, true);
     /// ```
     pub fn new(
-        lattice: Matrix3<f32>,
+        lattice: Matrix3<f64>,
         species: Vec<String>,
-        coords: Vec<Vector3<f32>>,
+        coords: Vec<Vector3<f64>>,
         coords_are_cart: bool,
     ) -> Structure {
-        let frac_coords: Vec<Vector3<f32>>;
-        let cart_coords: Vec<Vector3<f32>>;
+        let frac_coords: Vec<Vector3<f64>>;
+        let cart_coords: Vec<Vector3<f64>>;
 
         if coords_are_cart {
             frac_coords = Structure::get_frac_coords(&lattice, &coords);
@@ -72,22 +73,26 @@ impl Structure {
     }
 
     /// Length of cell vector `a` in angstroms
-    pub fn a(&self) -> f32 {
+    pub fn num_sites(&self) -> usize {
+        return self.species.len();
+    }
+    /// Length of cell vector `a` in angstroms
+    pub fn a(&self) -> f64 {
         return self.lattice.column(0).magnitude();
     }
 
     /// Length of cell vector `b` in angstroms
-    pub fn b(&self) -> f32 {
+    pub fn b(&self) -> f64 {
         return self.lattice.column(1).magnitude();
     }
 
     /// Length of cell vector `c` in angstroms
-    pub fn c(&self) -> f32 {
+    pub fn c(&self) -> f64 {
         return self.lattice.column(2).magnitude();
     }
 
     /// Angle `alpha` in degrees
-    pub fn alpha(&self) -> f32 {
+    pub fn alpha(&self) -> f64 {
         return ((self.lattice.column(0).dot(&self.lattice.column(1)))
             / (self.a().abs() * self.b().abs()))
         .acos()
@@ -95,7 +100,7 @@ impl Structure {
     }
 
     /// Angle `beta` in degrees
-    pub fn beta(&self) -> f32 {
+    pub fn beta(&self) -> f64 {
         return ((self.lattice.column(1).dot(&self.lattice.column(2)))
             / (self.b().abs() * self.c().abs()))
         .acos()
@@ -103,7 +108,7 @@ impl Structure {
     }
 
     /// Angle `gamma` in degrees
-    pub fn gamma(&self) -> f32 {
+    pub fn gamma(&self) -> f64 {
         return ((self.lattice.column(0).dot(&self.lattice.column(2)))
             / (self.a().abs() * self.c().abs()))
         .acos()
@@ -111,25 +116,25 @@ impl Structure {
     }
 
     /// Volume of the unit cell in angstroms
-    pub fn volume(&self) -> f32 {
+    pub fn volume(&self) -> f64 {
         return self.lattice.determinant();
     }
     /// Metric tensor of lattice matrix
-    pub fn metric_tensor(&self) -> Matrix3<f32> {
+    pub fn metric_tensor(&self) -> Matrix3<f64> {
         return self.lattice.transpose() * self.lattice;
     }
 
     /// Applied a transformation to the structure as: `lattice * trans_mat = lattice'`
     ///
     /// If the transformation results in a volume increase, then new atomic sites are searched for and added to the transformed cell.
-    pub fn apply_transformation(&mut self, trans_mat: &Matrix3<f32>, pos_tol: &f32) {
+    pub fn apply_transformation(&mut self, trans_mat: &Matrix3<f64>, pos_tol: &f64) {
         let frac_tols = Vector3::from_iterator(
             self.lattice
                 .column_iter()
                 .map(|col| pos_tol / col.magnitude()),
         );
 
-        let mut inv_trans_mat: Matrix3<f32> = Matrix3::identity();
+        let mut inv_trans_mat: Matrix3<f64> = Matrix3::identity();
 
         let inverted = try_invert_to(trans_mat.clone(), &mut inv_trans_mat);
 
@@ -139,10 +144,10 @@ impl Structure {
 
         let new_lattice = self.lattice * trans_mat;
 
-        let mut new_frac_coords: Vec<Vector3<f32>> = Vec::new();
+        let mut new_frac_coords: Vec<Vector3<f64>> = Vec::new();
         let mut new_species: Vec<String> = Vec::new();
 
-        let translation_vecs: Vec<Vector3<f32>> = vec![
+        let translation_vecs: Vec<Vector3<f64>> = vec![
             Vector3::new(1.0, 0.0, 0.0),
             Vector3::new(0.0, 1.0, 0.0),
             Vector3::new(0.0, 0.0, 1.0),
@@ -156,11 +161,11 @@ impl Structure {
 
         // Search for new sites in transformed cell using volume ratio to determine proper number of sites
         let mut mult = 0;
-        while (new_frac_coords.len() as f32 / self.coords.len() as f32) < volume_ratio && mult <= 10
+        while (new_frac_coords.len() as f64 / self.coords.len() as f64) < volume_ratio && mult <= 10
         {
             for (coord, specie) in self.frac_coords.iter().zip(&self.species) {
                 for translation_vec in translation_vecs.iter() {
-                    let mut frac_coord = *coord + (translation_vec * mult as f32);
+                    let mut frac_coord = *coord + (translation_vec * mult as f64);
 
                     frac_coord = inv_trans_mat * frac_coord;
 
@@ -198,10 +203,10 @@ impl Structure {
     }
 
     /// Computes the Delaunay matrix from the lattice matrix of the structure.
-    pub fn delaunay_matrix(&self) -> Matrix3x4<f32> {
+    pub fn delaunay_matrix(&self) -> Matrix3x4<f64> {
         let d4 = -1.0 * (self.lattice.column(0) + self.lattice.column(1) + self.lattice.column(2));
 
-        let cols: Vec<Vector3<f32>> = self
+        let cols: Vec<Vector3<f64>> = self
             .lattice
             .column_iter()
             .map(|vec| Vector3::new(vec[0], vec[1], vec[2]))
@@ -214,7 +219,7 @@ impl Structure {
     }
 
     /// Sets a new origin point for the unit cell.
-    pub fn set_origin(&mut self, fractional_vector: Vector3<f32>) {
+    pub fn set_origin(&mut self, fractional_vector: Vector3<f64>) {
         for vec in self.frac_coords.iter_mut() {
             *vec -= fractional_vector;
         }
@@ -222,7 +227,7 @@ impl Structure {
     }
 
     /// Normalizes fractional atomic positions to ensure all sites are within the unit cell.
-    pub fn normalize_coords(&mut self, pos_tol: &f32) {
+    pub fn normalize_coords(&mut self, pos_tol: &f64) {
         let frac_tols = Vector3::from_iterator(
             self.lattice
                 .column_iter()
@@ -234,17 +239,17 @@ impl Structure {
         let cart_coords = Self::get_cart_coords(&self.lattice, &self.frac_coords);
 
         // Sort coords according to species type to keep organized
-        let mut zipped_coords: Vec<(&String, &Vector3<f32>, &Vector3<f32>)> =
+        let mut zipped_coords: Vec<(&String, &Vector3<f64>, &Vector3<f64>)> =
             izip!(&self.species, &cart_coords, &self.frac_coords).collect();
 
         zipped_coords.sort_by(|a, b| a.0.cmp(b.0));
 
         let new_species: Vec<String> = zipped_coords.iter().map(|tuple| tuple.0.clone()).collect();
 
-        let new_cart_coords: Vec<Vector3<f32>> =
+        let new_cart_coords: Vec<Vector3<f64>> =
             zipped_coords.iter().map(|tuple| tuple.1.clone()).collect();
 
-        let new_frac_coords: Vec<Vector3<f32>> =
+        let new_frac_coords: Vec<Vector3<f64>> =
             zipped_coords.iter().map(|tuple| tuple.2.clone()).collect();
 
         self.species = new_species;
@@ -253,9 +258,9 @@ impl Structure {
     }
 
     pub fn get_cart_coords(
-        lattice: &Matrix3<f32>,
-        coords: &Vec<Vector3<f32>>,
-    ) -> Vec<Vector3<f32>> {
+        lattice: &Matrix3<f64>,
+        coords: &Vec<Vector3<f64>>,
+    ) -> Vec<Vector3<f64>> {
         let mut new_coords = coords.clone();
 
         for (i, coord) in coords.iter().enumerate() {
@@ -265,9 +270,9 @@ impl Structure {
     }
 
     pub fn get_frac_coords(
-        lattice: &Matrix3<f32>,
-        coords: &Vec<Vector3<f32>>,
-    ) -> Vec<Vector3<f32>> {
+        lattice: &Matrix3<f64>,
+        coords: &Vec<Vector3<f64>>,
+    ) -> Vec<Vector3<f64>> {
         let mut inverted_lattice = Matrix3::identity();
         let mut new_coords = coords.clone();
 
@@ -283,7 +288,7 @@ impl Structure {
         return new_coords;
     }
 
-    pub fn reciprocal_lattice(&self) -> Matrix3<f32> {
+    pub fn reciprocal_lattice(&self) -> Matrix3<f64> {
         let mut reciprocal_lattice = Matrix3::identity();
         let inverted = try_invert_to(self.lattice.clone(), &mut reciprocal_lattice);
 
@@ -292,6 +297,32 @@ impl Structure {
         }
 
         return reciprocal_lattice.transpose() * 2.0 * PI;
+    }
+
+    /// Get the element with the smallest amount of sites, alongside an element-site-number map.
+    pub fn get_min_element(&self) -> (String, HashMap<String, u16>, HashMap<String, u16>) {
+        let mut type_count: HashMap<String, u16> = HashMap::new();
+        let mut ele_inds: HashMap<String, u16> = HashMap::new();
+        let temp_ele = self.species.clone();
+
+        for (ele_ind, ele) in temp_ele.iter().enumerate() {
+            *type_count.entry(ele.clone()).or_insert(0) += 1;
+            ele_inds.entry(ele.clone()).or_insert(ele_ind as u16);
+        }
+
+        // Sorting ensures determinism when getting min
+        let mut sorted_pairs: Vec<(String, u16)> = Vec::from_iter(type_count.clone().into_iter());
+
+        sorted_pairs.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let min_ele = &sorted_pairs
+            .iter()
+            .min_by_key(|entry| entry.1)
+            .unwrap()
+            .0
+            .clone();
+
+        return (min_ele.clone(), ele_inds, type_count);
     }
 
     pub fn formulas(&self) -> (String, String) {

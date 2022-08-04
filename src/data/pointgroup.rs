@@ -64,12 +64,12 @@ lazy_static! {
     };
 
     // Encoded point group generator lookup from number
-    pub static ref PG_NUM_TO_HOLOHEDRY_GEN: HashMap<u8, Vec<u16>> = {
+    pub static ref PG_NUM_TO_GENERATOR_MATRICES: HashMap<u8, Vec<u16>> = {
         HashMap::from([
             (1, Vec::from([16484])),
             (2, Vec::from([16484, 3198])),
-            (3, Vec::from([16484, 3198, 7817])),
-            (4, Vec::from([16484, 7410, 3198, 7817])),
+            (3, Vec::from([16484, 7817, 3198])),
+            (4, Vec::from([16484, 7817, 12270, 3198])),
             (5, Vec::from([16484, 11784])),
             (6, Vec::from([16484, 3360, 11784])),
             (7, Vec::from([16484, 10816, 11784, 12272])),
@@ -80,8 +80,8 @@ lazy_static! {
             (12, Vec::from([16484, 3200, 3360])),
             (13, Vec::from([16484, 3360, 10816])),
             (14, Vec::from([16484, 7817])),
-            (15, Vec::from([16484, 12270, 7817])),
-            (16, Vec::from([16484, 7412, 7817])),
+            (15, Vec::from([16484, 7817, 12270])),
+            (16, Vec::from([16484, 7817, 7412])),
             (17, Vec::from([16484, 7898])),
             (18, Vec::from([16484, 7898, 3198])),
             (19, Vec::from([16484, 3360, 7898, 3198])),

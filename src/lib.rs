@@ -2,7 +2,9 @@ pub mod analyzer;
 pub mod data;
 pub mod pointgroup;
 pub mod reduce;
+pub mod spacegroup;
 pub mod structure;
+pub mod symmop;
 pub mod utils;
 
 use analyzer::SymmetryAnalyzer;
@@ -13,17 +15,54 @@ use structure::Structure;
 use pyo3::prelude::*;
 
 #[pyfunction]
-fn niggli_reduce(
-    lattice: Vec<f32>,
+fn find_primitive(
+    lattice: Vec<f64>,
     species: Vec<String>,
-    coords: Vec<Vec<f32>>,
+    coords: Vec<Vec<f64>>,
     coords_are_cart: bool,
-    dtol: f32,
-    atol: f32,
-    tol: f32,
-) -> PyResult<(Vec<f32>, Vec<String>, Vec<Vec<f32>>)> {
+    dtol: f64,
+    atol: f64,
+) -> PyResult<(Vec<f64>, Vec<String>, Vec<Vec<f64>>)> {
     let formatted_lattice = Matrix3::from_iterator(lattice.into_iter()); // Lattice needs to be column-major iterator
-    let formatted_coords: Vec<Vector3<f32>> = coords
+    let formatted_coords: Vec<Vector3<f64>> = coords
+        .iter()
+        .map(|vec| Vector3::new(vec[0], vec[1], vec[2]))
+        .collect();
+
+    let structure = Structure::new(
+        formatted_lattice,
+        species,
+        formatted_coords,
+        coords_are_cart,
+    );
+    let reducer = Reducer {
+        dtol: dtol,
+        atol: atol,
+    };
+
+    let prim_structure = reducer.find_primitive_cell(&structure);
+
+    let lattice_vec: Vec<f64> = prim_structure.lattice.iter().map(|x| *x).collect();
+    let mut coords_vec: Vec<Vec<f64>> = Vec::new();
+    for vec in prim_structure.frac_coords.iter() {
+        let new_vec: Vec<f64> = vec.iter().map(|x| *x).collect();
+        coords_vec.push(new_vec);
+    }
+    Ok((lattice_vec, prim_structure.species, coords_vec))
+}
+
+#[pyfunction]
+fn niggli_reduce(
+    lattice: Vec<f64>,
+    species: Vec<String>,
+    coords: Vec<Vec<f64>>,
+    coords_are_cart: bool,
+    dtol: f64,
+    atol: f64,
+    tol: f64,
+) -> PyResult<(Vec<f64>, Vec<String>, Vec<Vec<f64>>)> {
+    let formatted_lattice = Matrix3::from_iterator(lattice.into_iter()); // Lattice needs to be column-major iterator
+    let formatted_coords: Vec<Vector3<f64>> = coords
         .iter()
         .map(|vec| Vector3::new(vec[0], vec[1], vec[2]))
         .collect();
@@ -41,26 +80,26 @@ fn niggli_reduce(
 
     let niggli_structure = reducer.niggli_reduce(&structure, &tol);
 
-    let lattice_vec: Vec<f32> = niggli_structure.lattice.iter().map(|x| *x).collect();
-    let mut coords_vec: Vec<Vec<f32>> = Vec::new();
+    let lattice_vec: Vec<f64> = niggli_structure.lattice.iter().map(|x| *x).collect();
+    let mut coords_vec: Vec<Vec<f64>> = Vec::new();
     for vec in niggli_structure.frac_coords.iter() {
-        let new_vec: Vec<f32> = vec.iter().map(|x| *x).collect();
+        let new_vec: Vec<f64> = vec.iter().map(|x| *x).collect();
         coords_vec.push(new_vec);
     }
     Ok((lattice_vec, niggli_structure.species, coords_vec))
 }
 
 #[pyfunction]
-fn get_point_group_operations(
-    lattice: Vec<f32>,
+fn get_space_group_operations(
+    lattice: Vec<f64>,
     species: Vec<String>,
-    coords: Vec<Vec<f32>>,
+    coords: Vec<Vec<f64>>,
     coords_are_cart: bool,
-    dtol: f32,
-    atol: f32,
-) -> PyResult<Vec<Vec<i8>>> {
+    dtol: f64,
+    atol: f64,
+) -> PyResult<Vec<(Vec<i8>, Vec<f64>)>> {
     let formatted_lattice = Matrix3::from_iterator(lattice.into_iter()); // Lattice needs to be column-major iterator
-    let formatted_coords: Vec<Vector3<f32>> = coords
+    let formatted_coords: Vec<Vector3<f64>> = coords
         .iter()
         .map(|vec| Vector3::new(vec[0], vec[1], vec[2]))
         .collect();
@@ -76,29 +115,30 @@ fn get_point_group_operations(
         atol: atol,
     };
 
-    let point_group = sa.get_point_group_operations(&structure);
+    let space_group = sa.get_space_group_operations(&structure);
 
-    let mut vec_list: Vec<Vec<i8>> = Vec::new();
-    for mat in point_group.iter() {
-        let list: Vec<i8> = mat.transpose().iter().map(|x| *x).collect();
-        vec_list.push(list);
+    let mut op_list: Vec<(Vec<i8>, Vec<f64>)> = Vec::new();
+    for symm_op in space_group.operations.iter() {
+        let mat_list: Vec<i8> = symm_op.rotation.transpose().iter().map(|x| *x).collect();
+        let vec_list: Vec<f64> = symm_op.translation.iter().map(|x| *x).collect();
+        op_list.push((mat_list, vec_list));
     }
 
-    Ok(vec_list)
+    Ok(op_list)
 }
 
 #[pyfunction]
 fn get_standard_conventional_structure(
-    lattice: Vec<f32>,
+    lattice: Vec<f64>,
     species: Vec<String>,
-    coords: Vec<Vec<f32>>,
+    coords: Vec<Vec<f64>>,
     coords_are_cart: bool,
-    dtol: f32,
-    atol: f32,
-) -> PyResult<(Vec<f32>, Vec<String>, Vec<Vec<f32>>)> {
+    dtol: f64,
+    atol: f64,
+) -> PyResult<(Vec<f64>, Vec<String>, Vec<Vec<f64>>)> {
     let formatted_lattice = Matrix3::from_iterator(lattice.into_iter()); // Lattice needs to be column-major iterator
 
-    let formatted_coords: Vec<Vector3<f32>> = coords
+    let formatted_coords: Vec<Vector3<f64>> = coords
         .iter()
         .map(|vec| Vector3::new(vec[0], vec[1], vec[2]))
         .collect();
@@ -116,11 +156,11 @@ fn get_standard_conventional_structure(
     };
     let conv_struct = sa.get_standard_conventional_structure(&structure);
 
-    let lattice_vec: Vec<f32> = conv_struct.lattice.iter().map(|x| *x).collect();
+    let lattice_vec: Vec<f64> = conv_struct.lattice.iter().map(|x| *x).collect();
 
-    let mut coords_vec: Vec<Vec<f32>> = Vec::new();
+    let mut coords_vec: Vec<Vec<f64>> = Vec::new();
     for vec in conv_struct.frac_coords.iter() {
-        let new_vec: Vec<f32> = vec.iter().map(|x| *x).collect();
+        let new_vec: Vec<f64> = vec.iter().map(|x| *x).collect();
         coords_vec.push(new_vec);
     }
     Ok((lattice_vec, conv_struct.species, coords_vec))
@@ -128,16 +168,16 @@ fn get_standard_conventional_structure(
 
 #[pyfunction]
 fn get_standard_primitive_structure(
-    lattice: Vec<f32>,
+    lattice: Vec<f64>,
     species: Vec<String>,
-    coords: Vec<Vec<f32>>,
+    coords: Vec<Vec<f64>>,
     coords_are_cart: bool,
-    dtol: f32,
-    atol: f32,
-) -> PyResult<(Vec<f32>, Vec<String>, Vec<Vec<f32>>)> {
+    dtol: f64,
+    atol: f64,
+) -> PyResult<(Vec<f64>, Vec<String>, Vec<Vec<f64>>)> {
     let formatted_lattice = Matrix3::from_iterator(lattice.into_iter()); // Lattice needs to be column-major iterator
 
-    let formatted_coords: Vec<Vector3<f32>> = coords
+    let formatted_coords: Vec<Vector3<f64>> = coords
         .iter()
         .map(|vec| Vector3::new(vec[0], vec[1], vec[2]))
         .collect();
@@ -155,11 +195,11 @@ fn get_standard_primitive_structure(
     };
     let conv_struct = sa.get_standard_primitive_structure(&structure);
 
-    let lattice_vec: Vec<f32> = conv_struct.lattice.iter().map(|x| *x).collect();
+    let lattice_vec: Vec<f64> = conv_struct.lattice.iter().map(|x| *x).collect();
 
-    let mut coords_vec: Vec<Vec<f32>> = Vec::new();
+    let mut coords_vec: Vec<Vec<f64>> = Vec::new();
     for vec in conv_struct.frac_coords.iter() {
-        let new_vec: Vec<f32> = vec.iter().map(|x| *x).collect();
+        let new_vec: Vec<f64> = vec.iter().map(|x| *x).collect();
         coords_vec.push(new_vec);
     }
     Ok((lattice_vec, conv_struct.species, coords_vec))
@@ -173,7 +213,8 @@ fn crystsymm(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(niggli_reduce, m)?)?;
     m.add_function(wrap_pyfunction!(get_standard_conventional_structure, m)?)?;
     m.add_function(wrap_pyfunction!(get_standard_primitive_structure, m)?)?;
-    m.add_function(wrap_pyfunction!(get_point_group_operations, m)?)?;
+    m.add_function(wrap_pyfunction!(get_space_group_operations, m)?)?;
+    m.add_function(wrap_pyfunction!(find_primitive, m)?)?;
 
     Ok(())
 }

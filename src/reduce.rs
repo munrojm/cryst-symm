@@ -3,13 +3,12 @@ use crate::structure::Structure;
 use crate::utils::{cust_eq, normalize_frac_vectors, num_negative_zero};
 use nalgebra::{Matrix3, Matrix3x4, Vector3, Vector6};
 use std::collections::HashMap;
-use std::iter::FromIterator;
 use std::string::String;
 
 #[derive(Debug, Clone)]
 pub struct Reducer {
-    pub dtol: f32,
-    pub atol: f32,
+    pub dtol: f64,
+    pub atol: f64,
 }
 
 impl Reducer {
@@ -34,26 +33,8 @@ impl Reducer {
         //
         // 1.) Find atom type with the fewest sites
         //
-        let mut type_count: HashMap<&String, u16> = HashMap::new();
-        let mut ele_inds: HashMap<&String, u16> = HashMap::new();
-        let temp_ele = temp_structure.species.clone();
 
-        for (ele_ind, ele) in temp_ele.iter().enumerate() {
-            *type_count.entry(ele).or_insert(0) += 1;
-            ele_inds.entry(ele).or_insert(ele_ind as u16);
-        }
-
-        // Sorting ensures determinism when getting min
-        let mut sorted_pairs: Vec<(&String, u16)> = Vec::from_iter(type_count.into_iter());
-
-        sorted_pairs.sort_by(|a, b| a.0.cmp(b.0));
-
-        let min_ele = &sorted_pairs
-            .iter()
-            .min_by_key(|entry| entry.1)
-            .unwrap()
-            .0
-            .clone();
+        let (min_ele, ele_inds, _) = temp_structure.get_min_element();
 
         //
         // 2.) Shift origin to first atom of min_ele type and normalize coords
@@ -65,17 +46,17 @@ impl Reducer {
         //
         // 3.) Get all potential new unit translation lattice vectors
         //
-        let mut candidate_vecs: Vec<Vector3<f32>> = vec![
+        let mut candidate_vecs: Vec<Vector3<f64>> = vec![
             Vector3::new(1.0, 0.0, 0.0),
             Vector3::new(0.0, 1.0, 0.0),
             Vector3::new(0.0, 0.0, 1.0),
         ];
 
-        let base_site = temp_structure.frac_coords[*ele_inds.get(min_ele).unwrap() as usize];
+        let base_site = temp_structure.frac_coords[*ele_inds.get(&min_ele).unwrap() as usize];
 
         for (coord_ind, coord) in temp_structure.frac_coords.iter().enumerate() {
-            if (&temp_structure.species[coord_ind] == min_ele)
-                && (coord_ind != *ele_inds.get(min_ele).unwrap() as usize)
+            if (&temp_structure.species[coord_ind] == &min_ele)
+                && (coord_ind != *ele_inds.get(&min_ele).unwrap() as usize)
             {
                 let mut frac_diff = vec![coord - &base_site];
                 normalize_frac_vectors(&mut frac_diff, &frac_tols);
@@ -83,7 +64,7 @@ impl Reducer {
             }
         }
 
-        let mut translation_vecs: Vec<Vector3<f32>> = Vec::new();
+        let mut translation_vecs: Vec<Vector3<f64>> = Vec::new();
         let mut all_matched: bool;
         let mut matched: bool;
 
@@ -128,7 +109,7 @@ impl Reducer {
         // 3.) Sort potential vectors from smallest to largest and find three which span the lattice
         //
 
-        let mut cart_translation_vecs: Vec<Vector3<f32>> =
+        let mut cart_translation_vecs: Vec<Vector3<f64>> =
             Structure::get_cart_coords(&temp_structure.lattice, &translation_vecs);
 
         let frac_translation_vecs = self.get_shortest_translation_vecs(&mut cart_translation_vecs);
@@ -142,7 +123,7 @@ impl Reducer {
 
         let frac_matrix = Matrix3::from_columns(&smallest_frac_vecs);
 
-        let base_comb_vecs: Vec<Vector3<f32>> = vec![
+        let base_comb_vecs: Vec<Vector3<f64>> = vec![
             Vector3::new(1.0, 0.0, 0.0),
             Vector3::new(0.0, 1.0, 0.0),
             Vector3::new(0.0, 0.0, 1.0),
@@ -158,7 +139,7 @@ impl Reducer {
             Vector3::new(1.0, 1.0, -1.0),
         ];
 
-        let mut combination_vecs: Vec<Vector3<f32>> = Vec::new();
+        let mut combination_vecs: Vec<Vector3<f64>> = Vec::new();
 
         for comb_vec in base_comb_vecs {
             let transformed_vec = frac_matrix * comb_vec;
@@ -172,7 +153,7 @@ impl Reducer {
             }
         }
 
-        let mut cart_translation_vecs: Vec<Vector3<f32>> =
+        let mut cart_translation_vecs: Vec<Vector3<f64>> =
             Structure::get_cart_coords(&temp_structure.lattice, &combination_vecs);
 
         let final_cart_vecs = self.get_shortest_translation_vecs(&mut cart_translation_vecs);
@@ -186,7 +167,7 @@ impl Reducer {
 
         let temp_frac_coords = Structure::get_frac_coords(&new_lattice, &temp_structure.coords);
 
-        let mut new_frac_coords: Vec<Vector3<f32>> = Vec::new();
+        let mut new_frac_coords: Vec<Vector3<f64>> = Vec::new();
         let mut new_species: Vec<String> = Vec::new();
 
         for (coord, specie) in temp_frac_coords.iter().zip(&structure.species) {
@@ -219,14 +200,14 @@ impl Reducer {
     /// Produce a new structure which is Niggli reduced
     /// using the algorithm by Grosse-Kuntsleve et al.
     /// [Acta Cryst. (2004). A60, 1-6](https://doi.org/10.1107/S010876730302186X)
-    pub fn niggli_reduce(&self, structure: &Structure, tol: &f32) -> Structure {
+    pub fn niggli_reduce(&self, structure: &Structure, tol: &f64) -> Structure {
         let epsilon = tol * structure.volume().powf(1.0 / 3.0);
 
         let mut metric_tensor = structure.metric_tensor();
 
-        let mut transformation: Matrix3<f32> = Matrix3::identity();
+        let mut transformation: Matrix3<f64> = Matrix3::identity();
 
-        let (mut a, mut b, mut c, mut xi, mut eta, mut zeta): (f32, f32, f32, f32, f32, f32);
+        let (mut a, mut b, mut c, mut xi, mut eta, mut zeta): (f64, f64, f64, f64, f64, f64);
 
         for iteration in 0..101 {
             if iteration == 100 {
@@ -243,7 +224,7 @@ impl Reducer {
             );
 
             // A1
-            let c1: Matrix3<f32> = Matrix3::new(0.0, -1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, -1.0);
+            let c1: Matrix3<f64> = Matrix3::new(0.0, -1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, -1.0);
             if ((a - epsilon) > b)
                 || (cust_eq(&a, &b, &epsilon) && ((xi.abs() - epsilon) > eta.abs()))
             {
@@ -261,7 +242,7 @@ impl Reducer {
             }
 
             // A2
-            let c2: Matrix3<f32> = Matrix3::new(-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, -1.0, 0.0);
+            let c2: Matrix3<f64> = Matrix3::new(-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, -1.0, 0.0);
             if ((b - epsilon) > c)
                 || ((cust_eq(&b, &c, &epsilon)) && ((eta.abs() - epsilon) > zeta.abs()))
             {
@@ -289,7 +270,7 @@ impl Reducer {
                     k = -1.0;
                 };
             } else {
-                let mut p: &mut f32 = &mut 1.0;
+                let mut p: &mut f64 = &mut 1.0;
                 let mut prod = 1.0;
 
                 if (xi - epsilon) > 0.0 {
@@ -318,7 +299,7 @@ impl Reducer {
                 };
             };
 
-            let c3_4: Matrix3<f32> = Matrix3::new(i, 0.0, 0.0, 0.0, j, 0.0, 0.0, 0.0, k);
+            let c3_4: Matrix3<f64> = Matrix3::new(i, 0.0, 0.0, 0.0, j, 0.0, 0.0, 0.0, k);
             metric_tensor = c3_4.transpose() * metric_tensor * c3_4;
             transformation = transformation * c3_4;
 
@@ -337,7 +318,7 @@ impl Reducer {
                 || ((cust_eq(&xi, &b, &epsilon)) && ((zeta - epsilon) > (2.0 * eta)))
                 || ((cust_eq(&xi, &(-1.0 * b), &epsilon)) && (zeta < -epsilon))
             {
-                let c5: Matrix3<f32> =
+                let c5: Matrix3<f64> =
                     Matrix3::new(1.0, 0.0, 0.0, 0.0, 1.0, -1.0 * xi.signum(), 0.0, 0.0, 1.0);
                 metric_tensor = c5.transpose() * metric_tensor * c5;
                 transformation = transformation * c5;
@@ -350,7 +331,7 @@ impl Reducer {
                 || ((cust_eq(&eta, &a, &epsilon)) && ((zeta - epsilon) > (2.0 * xi)))
                 || ((cust_eq(&eta, &(-1.0 * a), &epsilon)) && (zeta < -epsilon))
             {
-                let c6: Matrix3<f32> =
+                let c6: Matrix3<f64> =
                     Matrix3::new(1.0, 0.0, -1.0 * eta.signum(), 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
                 metric_tensor = c6.transpose() * metric_tensor * c6;
                 transformation = transformation * c6;
@@ -363,7 +344,7 @@ impl Reducer {
                 || ((cust_eq(&zeta, &a, &epsilon)) && ((eta - epsilon) > (2.0 * xi)))
                 || ((cust_eq(&zeta, &(-1.0 * a), &epsilon)) && (eta < -epsilon))
             {
-                let c7: Matrix3<f32> =
+                let c7: Matrix3<f64> =
                     Matrix3::new(1.0, -1.0 * zeta.signum(), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
                 metric_tensor = c7.transpose() * metric_tensor * c7;
                 transformation = transformation * c7;
@@ -378,7 +359,7 @@ impl Reducer {
                 || ((cust_eq(&bool_sum, &0.0, &epsilon))
                     && (((2.0 * (a + eta)) + zeta - epsilon) > 0.0))
             {
-                let c8: Matrix3<f32> = Matrix3::new(1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0);
+                let c8: Matrix3<f64> = Matrix3::new(1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0);
                 metric_tensor = c8.transpose() * metric_tensor * c8;
                 transformation = transformation * c8;
                 continue;
@@ -459,12 +440,12 @@ impl Reducer {
             panic!("Reached max number of iterations without reduction!")
         }
 
-        let new_lattice: Matrix3<f32>;
+        let new_lattice: Matrix3<f64>;
 
         if full_reduction {
             // New lattice vectors are chosen as shortest from {a, b, c, d, a+b, b+c, c+a}
 
-            let mut base_vecs: Vec<Vector3<f32>> = delaunay_mat
+            let mut base_vecs: Vec<Vector3<f64>> = delaunay_mat
                 .column_iter()
                 .map(|vec| Vector3::from(vec))
                 .collect();
@@ -513,12 +494,12 @@ impl Reducer {
     /// Function to get three shortest (right-handed) cartestian translation vectors which still span the lattice.
     fn get_shortest_translation_vecs(
         &self,
-        cart_vecs: &mut Vec<Vector3<f32>>,
-    ) -> Vec<Vector3<f32>> {
+        cart_vecs: &mut Vec<Vector3<f64>>,
+    ) -> Vec<Vector3<f64>> {
         cart_vecs.sort_by(|a, b| a.magnitude().partial_cmp(&b.magnitude()).unwrap());
 
         let first = cart_vecs[0];
-        let mut cross_vec: Vector3<f32> = Vector3::new(0.0, 0.0, 0.0);
+        let mut cross_vec: Vector3<f64> = Vector3::new(0.0, 0.0, 0.0);
         let mut second_ind = 1;
         let mut third_ind = 2;
 
@@ -543,8 +524,8 @@ impl Reducer {
         return final_vecs;
     }
 
-    fn get_scalar_prods(delaunay_mat: &Matrix3x4<f32>) -> Vector6<f32> {
-        let mut scalar_prods: Vector6<f32> = Vector6::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    fn get_scalar_prods(delaunay_mat: &Matrix3x4<f64>) -> Vector6<f64> {
+        let mut scalar_prods: Vector6<f64> = Vector6::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         let mut ind = 0;
         for i in 0..3 {
             for j in (i + 1)..4 {

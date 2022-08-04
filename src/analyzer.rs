@@ -1,21 +1,26 @@
 use crate::data::core::{
-    CENTERING_TO_PRIM_TRANS, LATTICE_CHAR_TO_BRAVAIS, LATTICE_CHAR_TO_CONV_TRANS,
+    BravaisType, CENTERING_TO_PRIM_TRANS, INT_CONVERSION_MULT, LATTICE_CHAR_TO_BRAVAIS,
+    LATTICE_CHAR_TO_CONV_TRANS,
 };
 use crate::data::pointgroup::BRAVAIS_TO_HOLOHEDRY_NUM;
 use crate::pointgroup::PointGroup;
 use crate::reduce::Reducer;
+use crate::spacegroup::SpaceGroup;
 use crate::structure::Structure;
-use crate::utils::{compare_matrices, cust_eq, num_negative_zero};
+use crate::symmop::SymmOp;
+use crate::utils::{cust_eq, normalize_frac_vectors, num_negative_zero};
 use nalgebra::{Matrix3, Matrix4, Vector3};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct SymmetryAnalyzer {
-    pub dtol: f32,
-    pub atol: f32,
+    pub dtol: f64,
+    pub atol: f64,
 }
 
 impl SymmetryAnalyzer {
-    pub fn get_point_group_operations(&self, structure: &Structure) -> Vec<Matrix3<i8>> {
+    pub fn get_space_group_operations(&self, structure: &Structure) -> SpaceGroup {
+        // Get conventional structure, classify, and get space group generators
         let reducer = Reducer {
             dtol: self.dtol,
             atol: self.atol,
@@ -23,35 +28,166 @@ impl SymmetryAnalyzer {
 
         let prim_structure = reducer.find_primitive_cell(structure);
 
-        let reduced_structure = reducer.niggli_reduce(&prim_structure, &1e-5);
+        let mut reduced_structure = reducer.niggli_reduce(&prim_structure, &1e-5);
 
         let lattice_character = self.get_lattice_character(&reduced_structure, &1e-5);
 
-        let bravais_symbol = LATTICE_CHAR_TO_BRAVAIS.get(&lattice_character);
+        let trans_mat = LATTICE_CHAR_TO_CONV_TRANS
+            .get(&lattice_character)
+            .expect("Could not find the appropriate conventional transformation matrix!");
 
-        match bravais_symbol {
-            Some(symbol) => {
-                let holohedry_num = BRAVAIS_TO_HOLOHEDRY_NUM.get(&symbol).unwrap();
-                let holohedry_pg = PointGroup::from_number(holohedry_num);
+        let float_mat = Matrix3::from_iterator(trans_mat.iter().map(|&x| x as f64));
 
-                let mut pg_ops: Vec<Matrix3<i8>> = Vec::new();
-                let metric_tensor = structure.metric_tensor().clone();
+        reduced_structure.apply_transformation(&float_mat.transpose(), &self.dtol);
 
-                let tols: Vec<f32> = (0..9).map(|_| self.dtol).collect();
+        let bravais_symbol = LATTICE_CHAR_TO_BRAVAIS
+            .get(&lattice_character)
+            .expect("Could not find the appropriate lattice character or bravais symbol!");
 
-                for op in holohedry_pg.operations {
-                    let float_op = Matrix3::from_iterator(op.iter().map(|&x| x as f32));
-                    let transformed_metric_tensor = float_op.transpose() * metric_tensor * float_op;
+        let prim_trans_mat_int = CENTERING_TO_PRIM_TRANS
+            .get(&bravais_symbol.centering())
+            .expect("Could not find the appropriate primitive transformation matrix!");
 
-                    if compare_matrices(&transformed_metric_tensor, &metric_tensor, &tols) {
-                        pg_ops.push(op);
+        let float_mat: Matrix4<f64> =
+            Matrix4::from_iterator(prim_trans_mat_int.iter().map(|&x| x as f64));
+
+        let prim_trans_mat: Matrix3<f64> =
+            Matrix3::from(float_mat.fixed_slice::<3, 3>(0, 0)) / float_mat.m44;
+
+        reduced_structure.apply_transformation(&prim_trans_mat, &self.dtol);
+
+        let sg_generators = self.get_space_group_generators(&reduced_structure, bravais_symbol);
+
+        // Generate full coset representatives of space group with primitive generators and centering
+        let frac_tols = Vector3::from_iterator(
+            reduced_structure
+                .lattice
+                .column_iter()
+                .map(|col| self.dtol / col.magnitude()),
+        );
+
+        let sg = SpaceGroup::from_generators(&sg_generators, &frac_tols);
+
+        return sg;
+    }
+
+    fn get_space_group_generators(
+        &self,
+        prim_structure: &Structure,
+        bravais_symbol: &BravaisType,
+    ) -> Vec<SymmOp> {
+        let frac_tols = Vector3::from_iterator(
+            prim_structure
+                .lattice
+                .column_iter()
+                .map(|col| self.dtol / col.magnitude()),
+        );
+
+        // Get holohedral point group in primitive basis
+        let holohedry_num = BRAVAIS_TO_HOLOHEDRY_NUM.get(bravais_symbol).unwrap();
+        let mut holohedry_pg = PointGroup::from_number(holohedry_num);
+
+        let int_trans = CENTERING_TO_PRIM_TRANS
+            .get(&bravais_symbol.centering())
+            .unwrap();
+        let float_trans = Matrix4::from_iterator(int_trans.iter().map(|&x| x as f64));
+        let prim_transformation: Matrix3<f64> =
+            Matrix3::from(float_trans.fixed_slice::<3, 3>(0, 0)) / float_trans.m44;
+
+        holohedry_pg.apply_transformation(&prim_transformation);
+
+        // 1. Apply holohedral point group operation
+        // 2. Generate all candidate translation vectors to other sites
+        // 3. If the occurance number of a particular vector is equal to number of sites,
+        //    choose it as canonical translation for the operation.
+        // NOTE: These translations include both instrinsic translation and origin shift.
+        let mut op_trans_vecs: HashMap<Matrix3<i8>, Vec<Vector3<f64>>> = HashMap::new();
+
+        let (_, ele_inds, ele_counts) = prim_structure.get_min_element();
+
+        for op in holohedry_pg.operations {
+            let float_op = Matrix3::from_iterator(op.iter().map(|&x| x as f64));
+            let mut translation_vectors: Vec<Vector3<f64>> = Vec::new();
+
+            for (ele, ind) in ele_inds.iter() {
+                let start = ind.to_owned();
+                let end = start + ele_counts.get(ele).unwrap().to_owned();
+
+                for coord_ind in start..end {
+                    let rotated_coord = float_op * prim_structure.frac_coords[coord_ind as usize];
+
+                    for coord_ind in start..end {
+                        let mut translation_vec =
+                            vec![prim_structure.frac_coords[coord_ind as usize] - rotated_coord];
+
+                        normalize_frac_vectors(&mut translation_vec, &frac_tols);
+
+                        translation_vectors.push(translation_vec[0]);
+                    }
+                }
+            }
+
+            op_trans_vecs.insert(op, translation_vectors);
+        }
+
+        // Sort through candidate vectors and get counts
+        let mut sg_operations: Vec<SymmOp> = Vec::new();
+        let mut matched;
+
+        for (op, translation_vectors) in op_trans_vecs.iter() {
+            let mut translation_counts: HashMap<Vector3<i64>, u64> = HashMap::new();
+
+            for translation in translation_vectors.iter() {
+                let int_translation: Vector3<i64> = Vector3::from_iterator(
+                    translation
+                        .iter()
+                        .map(|&x| (x * INT_CONVERSION_MULT) as i64),
+                );
+
+                matched = false;
+
+                for (count_vector, count) in translation_counts.iter_mut() {
+                    let float_count_translation: Vector3<f64> = Vector3::from_iterator(
+                        count_vector.iter().map(|&x| x as f64 / INT_CONVERSION_MULT),
+                    );
+
+                    let mut diff = vec![translation - float_count_translation];
+                    normalize_frac_vectors(&mut diff, &frac_tols);
+
+                    let cart_coord_delta =
+                        Structure::get_cart_coords(&prim_structure.lattice, &diff);
+
+                    if cart_coord_delta[0].magnitude().abs() <= (2.0 * self.dtol) {
+                        *count += 1;
+                        matched = true;
+                        break;
                     }
                 }
 
-                return pg_ops;
+                if !matched {
+                    translation_counts.insert(int_translation, 1);
+                }
             }
-            None => panic!("Could not find the appropriate lattice character or bravais symbol!"),
+            // Check for counts that are equal to the number of sites and choose final translation
+            // vector for the given rotation operation.
+
+            for (int_translation_vector, count) in translation_counts.into_iter() {
+                if count as usize == prim_structure.num_sites() {
+                    let float_translation: Vector3<f64> = Vector3::from_iterator(
+                        int_translation_vector
+                            .iter()
+                            .map(|&x| x as f64 / INT_CONVERSION_MULT),
+                    );
+
+                    sg_operations.push(SymmOp {
+                        rotation: op.clone(),
+                        translation: float_translation,
+                    });
+                }
+            }
         }
+
+        return sg_operations;
     }
 
     /// Obtains the crystallographic primitive crystal structure
@@ -67,37 +203,29 @@ impl SymmetryAnalyzer {
 
         let lattice_character = self.get_lattice_character(&reduced_structure, &1e-5);
 
-        let trans_mat = LATTICE_CHAR_TO_CONV_TRANS.get(&lattice_character);
+        let trans_mat = LATTICE_CHAR_TO_CONV_TRANS
+            .get(&lattice_character)
+            .expect("Could not find the appropriate conventional transformation matrix!");
 
-        match trans_mat {
-            Some(mat) => {
-                let float_mat = Matrix3::from_iterator(mat.iter().map(|&x| x as f32));
-                reduced_structure.apply_transformation(&float_mat.transpose(), &self.dtol);
-            }
-            None => panic!("Could not find the appropriate conventional transformation matrix!"),
-        }
+        let float_mat = Matrix3::from_iterator(trans_mat.iter().map(|&x| x as f64));
 
-        let bravais_symbol = LATTICE_CHAR_TO_BRAVAIS.get(&lattice_character);
+        reduced_structure.apply_transformation(&float_mat.transpose(), &self.dtol);
 
-        match bravais_symbol {
-            Some(symbol) => {
-                let prim_trans_mat = CENTERING_TO_PRIM_TRANS.get(&symbol.centering());
-                match prim_trans_mat {
-                    Some(mat) => {
-                        let float_mat: Matrix4<f32> =
-                            Matrix4::from_iterator(mat.iter().map(|&x| x as f32));
+        let bravais_symbol = LATTICE_CHAR_TO_BRAVAIS
+            .get(&lattice_character)
+            .expect("Could not find the appropriate lattice character or bravais symbol!");
 
-                        let prim_trans_mat: Matrix3<f32> =
-                            Matrix3::from(float_mat.fixed_slice::<3, 3>(0, 0)) / float_mat.m44;
-                        reduced_structure.apply_transformation(&prim_trans_mat, &self.dtol);
-                    }
-                    None => {
-                        panic!("Could not find the appropriate primitive transformation matrix!")
-                    }
-                }
-            }
-            None => panic!("Could not find the appropriate lattice character or bravais symbol!"),
-        }
+        let prim_trans_mat_int = CENTERING_TO_PRIM_TRANS
+            .get(&bravais_symbol.centering())
+            .expect("Could not find the appropriate primitive transformation matrix!");
+
+        let float_mat: Matrix4<f64> =
+            Matrix4::from_iterator(prim_trans_mat_int.iter().map(|&x| x as f64));
+
+        let prim_trans_mat: Matrix3<f64> =
+            Matrix3::from(float_mat.fixed_slice::<3, 3>(0, 0)) / float_mat.m44;
+
+        reduced_structure.apply_transformation(&prim_trans_mat, &self.dtol);
 
         return reduced_structure;
     }
@@ -118,7 +246,7 @@ impl SymmetryAnalyzer {
 
         match trans_mat {
             Some(mat) => {
-                let float_mat = Matrix3::from_iterator(mat.iter().map(|&x| x as f32));
+                let float_mat = Matrix3::from_iterator(mat.iter().map(|&x| x as f64));
                 reduced_structure.apply_transformation(&float_mat.transpose(), &self.dtol);
             }
             None => panic!("Could not find the appropriate conventional transformation matrix!"),
@@ -128,7 +256,7 @@ impl SymmetryAnalyzer {
     }
 
     /// Classify the reduced structure accoring to one of the 44 lattice characters.
-    fn get_lattice_character(&self, reduced_structure: &Structure, tol: &f32) -> u8 {
+    fn get_lattice_character(&self, reduced_structure: &Structure, tol: &f64) -> u8 {
         let epsilon = tol * reduced_structure.volume().powf(1.0 / 3.0);
 
         let a_vec = Vector3::from(reduced_structure.lattice.column(0));
@@ -156,7 +284,7 @@ impl SymmetryAnalyzer {
 
         let mut char_num = 0;
 
-        let vecs: Vec<(Vector3<f32>, u8)>;
+        let vecs: Vec<(Vector3<f64>, u8)>;
 
         if cust_eq(&a, &b, &epsilon) && cust_eq(&a, &c, &epsilon) {
             vecs = Self::get_first_set(type_i, a, b, d, e, f, epsilon);
@@ -192,11 +320,11 @@ impl SymmetryAnalyzer {
         };
     }
 
-    fn extra_eval_a(a: f32, b: f32, d: f32, e: f32, f: f32, epsilon: f32) -> bool {
+    fn extra_eval_a(a: f64, b: f64, d: f64, e: f64, f: f64, epsilon: f64) -> bool {
         return cust_eq(&((d + e + f).abs() * 2.0), &(a + b), &epsilon);
     }
 
-    fn extra_eval_b(a: f32, b: f32, d: f32, e: f32, f: f32, epsilon: f32) -> bool {
+    fn extra_eval_b(a: f64, b: f64, d: f64, e: f64, f: f64, epsilon: f64) -> bool {
         let c1 = cust_eq(&((d + e + f).abs() * 2.0), &(a + b), &epsilon);
         let c2 = cust_eq(&((2.0 * d + f).abs()), &b, &epsilon);
         return c1 && c2;
@@ -205,13 +333,13 @@ impl SymmetryAnalyzer {
     /// Generate first set of lattice character DEF-vectors corresponding to A=B=C
     fn get_first_set(
         type_i: bool,
-        a: f32,
-        b: f32,
-        d: f32,
-        e: f32,
-        f: f32,
-        epsilon: f32,
-    ) -> Vec<(Vector3<f32>, u8)> {
+        a: f64,
+        b: f64,
+        d: f64,
+        e: f64,
+        f: f64,
+        epsilon: f64,
+    ) -> Vec<(Vector3<f64>, u8)> {
         let mut vecs = Vec::new();
         if type_i {
             vecs.push((Vector3::new(a, a, a) / 2.0, 1));
@@ -233,13 +361,13 @@ impl SymmetryAnalyzer {
     /// Generate second set of lattice character DEF-vectors corresponding to A=B and no conditions on C
     fn get_second_set(
         type_i: bool,
-        a: f32,
-        b: f32,
-        d: f32,
-        e: f32,
-        f: f32,
-        epsilon: f32,
-    ) -> Vec<(Vector3<f32>, u8)> {
+        a: f64,
+        b: f64,
+        d: f64,
+        e: f64,
+        f: f64,
+        epsilon: f64,
+    ) -> Vec<(Vector3<f64>, u8)> {
         let mut vecs = Vec::new();
         if type_i {
             vecs.push((Vector3::new(a, a, a) / 2.0, 9));
@@ -261,13 +389,13 @@ impl SymmetryAnalyzer {
     /// Generate third set of lattice character DEF-vectors corresponding to B=C and no conditions on A
     fn get_third_set(
         type_i: bool,
-        a: f32,
-        b: f32,
-        d: f32,
-        e: f32,
-        f: f32,
-        epsilon: f32,
-    ) -> Vec<(Vector3<f32>, u8)> {
+        a: f64,
+        b: f64,
+        d: f64,
+        e: f64,
+        f: f64,
+        epsilon: f64,
+    ) -> Vec<(Vector3<f64>, u8)> {
         let mut vecs = Vec::new();
         if type_i {
             vecs.push((Vector3::new(a / 4.0, a / 2.0, a / 2.0), 18));
@@ -289,12 +417,12 @@ impl SymmetryAnalyzer {
     /// Generate fourth set of lattice character DEF-vectors corresponding to no conditions on A, B, C
     fn get_fourth_set(
         type_i: bool,
-        a: f32,
-        b: f32,
-        d: f32,
-        e: f32,
-        f: f32,
-    ) -> Vec<(Vector3<f32>, u8)> {
+        a: f64,
+        b: f64,
+        d: f64,
+        e: f64,
+        f: f64,
+    ) -> Vec<(Vector3<f64>, u8)> {
         let mut vecs = Vec::new();
         if type_i {
             vecs.push((Vector3::new(a / 4.0, a / 2.0, a / 2.0), 26));
