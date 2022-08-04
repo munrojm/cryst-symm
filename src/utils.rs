@@ -55,7 +55,7 @@ pub fn cust_eq(a: &f64, b: &f64, epsilon: &f64) -> bool {
     return !((a < &(b - epsilon)) || (b < &(a - epsilon)));
 }
 
-/// Decode a vector of integers which encoded in a particular base.
+/// Decode a vector of integers which is encoded in a particular base.
 /// Outputs data into the vector passed to `out`.
 pub fn decode(e: u16, base: u8, sub: i8, len: i8) -> Vec<i8> {
     let mut out: Vec<i8> = Vec::new();

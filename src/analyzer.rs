@@ -56,7 +56,7 @@ impl SymmetryAnalyzer {
 
         reduced_structure.apply_transformation(&prim_trans_mat, &self.dtol);
 
-        let sg_generators = self.get_space_group_generators(&reduced_structure, bravais_symbol);
+        let sg_generators = self.get_primtitive_space_group_ops(&reduced_structure, bravais_symbol);
 
         // Generate full coset representatives of space group with primitive generators and centering
         let frac_tols = Vector3::from_iterator(
@@ -71,7 +71,7 @@ impl SymmetryAnalyzer {
         return sg;
     }
 
-    fn get_space_group_generators(
+    fn get_primtitive_space_group_ops(
         &self,
         prim_structure: &Structure,
         bravais_symbol: &BravaisType,
@@ -113,12 +113,12 @@ impl SymmetryAnalyzer {
                 let start = ind.to_owned();
                 let end = start + ele_counts.get(ele).unwrap().to_owned();
 
-                for coord_ind in start..end {
-                    let rotated_coord = float_op * prim_structure.frac_coords[coord_ind as usize];
+                for coord_ind_a in start..end {
+                    let rotated_coord = float_op * prim_structure.frac_coords[coord_ind_a as usize];
 
-                    for coord_ind in start..end {
+                    for coord_ind_b in start..end {
                         let mut translation_vec =
-                            vec![prim_structure.frac_coords[coord_ind as usize] - rotated_coord];
+                            vec![prim_structure.frac_coords[coord_ind_b as usize] - rotated_coord];
 
                         normalize_frac_vectors(&mut translation_vec, &frac_tols);
 
@@ -168,9 +168,9 @@ impl SymmetryAnalyzer {
                     translation_counts.insert(int_translation, 1);
                 }
             }
+
             // Check for counts that are equal to the number of sites and choose final translation
             // vector for the given rotation operation.
-
             for (int_translation_vector, count) in translation_counts.into_iter() {
                 if count as usize == prim_structure.num_sites() {
                     let float_translation: Vector3<f64> = Vector3::from_iterator(
