@@ -49,24 +49,20 @@ impl SpaceGroup {
 
         for op in self.operations.iter_mut() {
             let mut float_rot = Matrix3::from_iterator(op.rotation.iter().map(|&x| x as f64));
-            let mut float_trans = Vector3::from_iterator(op.translation.iter().map(|&x| x as f64));
 
             float_rot = inv_trans_mat * float_rot * transformation_matrix;
-            float_trans = inv_trans_mat * float_trans;
+            op.translation = inv_trans_mat * op.translation;
 
             op.rotation = Matrix3::from_iterator(float_rot.iter().map(|&x| x as i8));
-            op.translation = float_trans
         }
 
         for op in self.generators.iter_mut() {
             let mut float_rot = Matrix3::from_iterator(op.rotation.iter().map(|&x| x as f64));
-            let mut float_trans = Vector3::from_iterator(op.translation.iter().map(|&x| x as f64));
 
             float_rot = inv_trans_mat * float_rot * transformation_matrix;
-            float_trans = inv_trans_mat * float_trans;
+            op.translation = inv_trans_mat * op.translation;
 
             op.rotation = Matrix3::from_iterator(float_rot.iter().map(|&x| x as i8));
-            op.translation = float_trans
         }
     }
 }
