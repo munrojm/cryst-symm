@@ -1,6 +1,7 @@
 use crate::symmop::SymmOp;
 use itertools::iproduct;
 use nalgebra::Vector3;
+use nalgebra::{try_invert_to, Matrix3};
 
 pub struct SpaceGroup {
     pub operations: Vec<SymmOp>,
@@ -35,5 +36,37 @@ impl SpaceGroup {
             operations: symm_ops,
             generators: generators.clone(),
         };
+    }
+
+    /// Transform symmetry operations `{R|t} -> {R'|t'}` according to `T^-1 R T = R'` and `T^-1 t = t'`.
+    pub fn apply_transformation(&mut self, transformation_matrix: &Matrix3<f64>) {
+        let mut inv_trans_mat: Matrix3<f64> = Matrix3::identity();
+        let inverted = try_invert_to(transformation_matrix.clone(), &mut inv_trans_mat);
+
+        if !inverted {
+            panic!("Transformation matrix is not invertible!");
+        }
+
+        for op in self.operations.iter_mut() {
+            let mut float_rot = Matrix3::from_iterator(op.rotation.iter().map(|&x| x as f64));
+            let mut float_trans = Vector3::from_iterator(op.translation.iter().map(|&x| x as f64));
+
+            float_rot = inv_trans_mat * float_rot * transformation_matrix;
+            float_trans = inv_trans_mat * float_trans;
+
+            op.rotation = Matrix3::from_iterator(float_rot.iter().map(|&x| x as i8));
+            op.translation = float_trans
+        }
+
+        for op in self.generators.iter_mut() {
+            let mut float_rot = Matrix3::from_iterator(op.rotation.iter().map(|&x| x as f64));
+            let mut float_trans = Vector3::from_iterator(op.translation.iter().map(|&x| x as f64));
+
+            float_rot = inv_trans_mat * float_rot * transformation_matrix;
+            float_trans = inv_trans_mat * float_trans;
+
+            op.rotation = Matrix3::from_iterator(float_rot.iter().map(|&x| x as i8));
+            op.translation = float_trans
+        }
     }
 }

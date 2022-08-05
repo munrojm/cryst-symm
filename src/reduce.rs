@@ -35,7 +35,7 @@ impl Reducer {
         // 1.) Find atom type with the fewest sites
         //
 
-        let (min_ele, ele_inds, ele_counts) = temp_structure.get_min_element();
+        let (min_ele, ele_inds, _) = temp_structure.get_min_element();
 
         //
         // 2.) Shift origin to first atom of min_ele type and normalize coords
@@ -69,6 +69,7 @@ impl Reducer {
         let mut all_matched: bool;
         let mut matched: bool;
 
+        // TODO: Ensure inner loop is only over sites with the same specie type to speed up
         for vec in candidate_vecs.iter() {
             all_matched = true;
             for (coord, specie) in temp_structure
