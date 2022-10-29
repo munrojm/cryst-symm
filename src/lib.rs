@@ -12,7 +12,7 @@ use nalgebra::{Matrix3, Vector3};
 use reduce::Reducer;
 use structure::Structure;
 
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::PyList};
 
 #[pyfunction]
 fn find_primitive(
@@ -174,7 +174,37 @@ fn get_standard_primitive_structure(
     coords_are_cart: bool,
     dtol: f64,
     atol: f64,
-) -> PyResult<(Vec<f64>, Vec<String>, Vec<Vec<f64>>)> {
+) -> PyResult<(Vec<f64>, Vec<String>, PyObject)> {
+    let structure = generate_structure(lattice, species, coords, coords_are_cart);
+
+    let sa = SymmetryAnalyzer {
+        dtol: dtol,
+        atol: atol,
+    };
+    let conv_struct = sa.get_standard_primitive_structure(&structure);
+
+    let lattice_vec: Vec<f64> = conv_struct.lattice.iter().map(|x| *x).collect();
+
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let coords_vec = vec![0; conv_struct.frac_coords.len()];
+    let coords_vec = PyList::new(py, &coords_vec);
+
+    for (ind, vec) in conv_struct.frac_coords.iter().enumerate() {
+        let new_vec: Vec<f64> = vec.iter().map(|x| *x).collect();
+        coords_vec
+            .set_item(ind, new_vec)
+            .expect("Could not create coordinate vector PyList");
+    }
+    Ok((lattice_vec, conv_struct.species, coords_vec.to_object(py)))
+}
+
+fn generate_structure(
+    lattice: Vec<f64>,
+    species: Vec<String>,
+    coords: Vec<Vec<f64>>,
+    coords_are_cart: bool,
+) -> Structure {
     let formatted_lattice = Matrix3::from_iterator(lattice.into_iter()); // Lattice needs to be column-major iterator
 
     let formatted_coords: Vec<Vector3<f64>> = coords
@@ -189,20 +219,7 @@ fn get_standard_primitive_structure(
         coords_are_cart,
     );
 
-    let sa = SymmetryAnalyzer {
-        dtol: dtol,
-        atol: atol,
-    };
-    let conv_struct = sa.get_standard_primitive_structure(&structure);
-
-    let lattice_vec: Vec<f64> = conv_struct.lattice.iter().map(|x| *x).collect();
-
-    let mut coords_vec: Vec<Vec<f64>> = Vec::new();
-    for vec in conv_struct.frac_coords.iter() {
-        let new_vec: Vec<f64> = vec.iter().map(|x| *x).collect();
-        coords_vec.push(new_vec);
-    }
-    Ok((lattice_vec, conv_struct.species, coords_vec))
+    return structure;
 }
 
 /// A Python module implemented in Rust. The name of this function must match
