@@ -62,7 +62,7 @@ lazy_static! {
         ])
     };
 
-    // Encoded point group generator lookup from number
+    // Encoded conventional setting point group generators lookup from number
     pub static ref PG_NUM_TO_GENERATOR_MATRICES: HashMap<u8, Vec<u16>> = {
         HashMap::from([
             (1, Vec::from([16484])),
