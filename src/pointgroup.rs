@@ -4,10 +4,9 @@ use itertools::iproduct;
 use nalgebra::{try_invert_to, Matrix3};
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use std::string::String;
 
 pub struct PointGroup {
-    pub symbol: String,
+    pub symbol: &'static str,
     pub operations: Vec<Matrix3<i8>>,
     pub generators: Vec<Matrix3<i8>>,
 }
@@ -30,7 +29,7 @@ impl PointGroup {
         let operations = Self::generate_operations(&decoded_matrices);
 
         return Self {
-            symbol: symbol.to_owned(),
+            symbol: symbol,
             operations: operations,
             generators: decoded_matrices,
         };
