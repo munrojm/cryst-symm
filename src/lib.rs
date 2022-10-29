@@ -45,11 +45,11 @@ fn generate_output_structure_data(structure: Structure) -> (Vec<f64>, Vec<String
     let coords_vec = vec![0; structure.frac_coords.len()];
     let coords_vec = PyList::new(py, &coords_vec);
 
-    for (ind, vec) in structure.frac_coords.iter().enumerate() {
+    for vec in structure.frac_coords.iter() {
         let new_vec: Vec<f64> = vec.iter().map(|x| *x).collect();
         coords_vec
-            .set_item(ind, new_vec)
-            .expect("Could not create coordinate vector PyList");
+            .append(new_vec)
+            .expect("Could not append coordinate vector to PyList");
     }
 
     return (lattice_vec, structure.species, coords_vec.to_object(py));
@@ -172,8 +172,7 @@ fn get_standard_primitive_structure(
     let output_data = generate_output_structure_data(conv_struct);
 
     return Ok(output_data);
-
-
+}
 
 /// A Python module implemented in Rust. The name of this function must match
 /// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
