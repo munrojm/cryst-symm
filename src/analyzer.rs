@@ -30,10 +30,10 @@ impl SymmetryAnalyzer {
 
         let mut reduced_structure = reducer.niggli_reduce(&prim_structure, &1e-5);
 
-        let (trans_mat, lattice_character) =
+        let (conv_trans_mat, lattice_character) =
             self.conventional_transformation_matrix(&reduced_structure);
 
-        reduced_structure.apply_transformation(&trans_mat.transpose(), &self.dtol); // Standard conventional structure
+        reduced_structure.apply_transformation(&conv_trans_mat.transpose(), &self.dtol); // Standard conventional structure
 
         let (prim_trans_mat, bravais_symbol) =
             self.primitive_transformation_matrix(&lattice_character);
@@ -50,7 +50,14 @@ impl SymmetryAnalyzer {
                 .map(|col| self.dtol / col.magnitude()),
         );
 
-        let sg = SpaceGroup::from_generators(&sg_generators, &frac_tols);
+        let mut sg = SpaceGroup::from_generators(&sg_generators, &frac_tols);
+
+        // Put operations back into the basis of the input structure
+        let niggli_trans_mat = prim_structure.get_transformation_matrix(structure);
+
+        let total_trans_mat = niggli_trans_mat * conv_trans_mat * prim_trans_mat;
+
+        sg.apply_transformation(&total_trans_mat);
 
         return sg;
     }

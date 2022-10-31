@@ -365,4 +365,19 @@ impl Structure {
         }
         return (formula, reduced_formula);
     }
+
+    /// Attempts to get the matrix that transforms this structure into the one provided.
+    pub fn get_transformation_matrix(&self, structure: &Self) -> Matrix3<f64> {
+        let mut inv_lattice: Matrix3<f64> = Matrix3::identity();
+
+        let inverted = try_invert_to(self.lattice.clone(), &mut inv_lattice);
+
+        if !inverted {
+            panic!("Lattice matrix is not invertible!");
+        }
+
+        let trans_mat = inv_lattice * structure.lattice;
+
+        return trans_mat;
+    }
 }
