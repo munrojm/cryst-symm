@@ -30,32 +30,17 @@ impl SymmetryAnalyzer {
 
         let mut reduced_structure = reducer.niggli_reduce(&prim_structure, &1e-5);
 
-        let lattice_character = self.get_lattice_character(&reduced_structure, &1e-5);
+        let (trans_mat, lattice_character) =
+            self.conventional_transformation_matrix(&reduced_structure);
 
-        let trans_mat = LATTICE_CHAR_TO_CONV_TRANS
-            .get(&lattice_character)
-            .expect("Could not find the appropriate conventional transformation matrix!");
+        reduced_structure.apply_transformation(&trans_mat.transpose(), &self.dtol); // Standard conventional structure
 
-        let float_mat = trans_mat.as_float();
-
-        reduced_structure.apply_transformation(&float_mat.transpose(), &self.dtol); // Standard conventional structure
-
-        let bravais_symbol = LATTICE_CHAR_TO_BRAVAIS
-            .get(&lattice_character)
-            .expect("Could not find the appropriate lattice character or bravais symbol!");
-
-        let prim_trans_mat_int = CENTERING_TO_PRIM_TRANS
-            .get(&bravais_symbol.centering())
-            .expect("Could not find the appropriate primitive transformation matrix!");
-
-        let float_mat = prim_trans_mat_int.as_float();
-
-        let prim_trans_mat: Matrix3<f64> =
-            Matrix3::from(float_mat.fixed_slice::<3, 3>(0, 0)) / float_mat.m44;
+        let (prim_trans_mat, bravais_symbol) =
+            self.primitive_transformation_matrix(&lattice_character);
 
         reduced_structure.apply_transformation(&prim_trans_mat, &self.dtol); // Standard primitive structure
 
-        let sg_generators = self.get_primtitive_space_group_ops(&reduced_structure, bravais_symbol);
+        let sg_generators = self.get_primitive_space_group_ops(&reduced_structure, bravais_symbol);
 
         // Generate full coset representatives of space group with primitive generators and centering
         let frac_tols = Vector3::from_iterator(
@@ -70,7 +55,7 @@ impl SymmetryAnalyzer {
         return sg;
     }
 
-    fn get_primtitive_space_group_ops(
+    fn get_primitive_space_group_ops(
         &self,
         prim_structure: &Structure,
         bravais_symbol: &BravaisType,
@@ -202,16 +187,22 @@ impl SymmetryAnalyzer {
 
         let mut reduced_structure = reducer.niggli_reduce(&prim_structure, &1e-5);
 
-        let lattice_character = self.get_lattice_character(&reduced_structure, &1e-5);
+        let (trans_mat, lattice_character) =
+            self.conventional_transformation_matrix(&reduced_structure);
 
-        let trans_mat = LATTICE_CHAR_TO_CONV_TRANS
-            .get(&lattice_character)
-            .expect("Could not find the appropriate conventional transformation matrix!");
+        reduced_structure.apply_transformation(&trans_mat.transpose(), &self.dtol);
 
-        let float_mat = trans_mat.as_float();
+        let (prim_trans_mat, _) = self.primitive_transformation_matrix(&lattice_character);
 
-        reduced_structure.apply_transformation(&float_mat.transpose(), &self.dtol);
+        reduced_structure.apply_transformation(&prim_trans_mat, &self.dtol);
 
+        return reduced_structure;
+    }
+
+    fn primitive_transformation_matrix(
+        &self,
+        lattice_character: &u8,
+    ) -> (Matrix3<f64>, &BravaisType) {
         let bravais_symbol = LATTICE_CHAR_TO_BRAVAIS
             .get(&lattice_character)
             .expect("Could not find the appropriate lattice character or bravais symbol!");
@@ -225,9 +216,7 @@ impl SymmetryAnalyzer {
         let prim_trans_mat: Matrix3<f64> =
             Matrix3::from(float_mat.fixed_slice::<3, 3>(0, 0)) / float_mat.m44;
 
-        reduced_structure.apply_transformation(&prim_trans_mat, &self.dtol);
-
-        return reduced_structure;
+        return (prim_trans_mat, bravais_symbol);
     }
 
     /// Obtains the crystallographic standard conventional structure
@@ -242,6 +231,17 @@ impl SymmetryAnalyzer {
 
         let mut reduced_structure = reducer.niggli_reduce(&prim_structure, &1e-5);
 
+        let (trans_mat, _) = self.conventional_transformation_matrix(&reduced_structure);
+
+        reduced_structure.apply_transformation(&trans_mat.transpose(), &self.dtol);
+
+        return reduced_structure;
+    }
+
+    fn conventional_transformation_matrix(
+        &self,
+        reduced_structure: &Structure,
+    ) -> (Matrix3<f64>, u8) {
         let lattice_character = self.get_lattice_character(&reduced_structure, &1e-5);
 
         let trans_mat = LATTICE_CHAR_TO_CONV_TRANS
@@ -250,9 +250,7 @@ impl SymmetryAnalyzer {
 
         let float_mat = trans_mat.as_float();
 
-        reduced_structure.apply_transformation(&float_mat.transpose(), &self.dtol);
-
-        return reduced_structure;
+        return (float_mat, lattice_character);
     }
 
     /// Classify the reduced structure accoring to one of the 44 lattice characters.
