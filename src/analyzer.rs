@@ -7,9 +7,9 @@ use crate::pointgroup::PointGroup;
 use crate::reduce::Reducer;
 use crate::spacegroup::SpaceGroup;
 use crate::structure::Structure;
-use crate::symmop::SymmOp;
+use crate::symmop::{MatrixExt, SymmOp};
 use crate::utils::{cust_eq, normalize_frac_vectors, num_negative_zero};
-use nalgebra::{Matrix3, Matrix4, Vector3};
+use nalgebra::{ArrayStorage, Matrix3, Matrix4, Vector3, U3, U4};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -36,7 +36,7 @@ impl SymmetryAnalyzer {
             .get(&lattice_character)
             .expect("Could not find the appropriate conventional transformation matrix!");
 
-        let float_mat = Matrix3::from_iterator(trans_mat.iter().map(|&x| x as f64));
+        let float_mat = trans_mat.as_float();
 
         reduced_structure.apply_transformation(&float_mat.transpose(), &self.dtol); // Standard conventional structure
 
@@ -48,8 +48,7 @@ impl SymmetryAnalyzer {
             .get(&bravais_symbol.centering())
             .expect("Could not find the appropriate primitive transformation matrix!");
 
-        let float_mat: Matrix4<f64> =
-            Matrix4::from_iterator(prim_trans_mat_int.iter().map(|&x| x as f64));
+        let float_mat = prim_trans_mat_int.as_float();
 
         let prim_trans_mat: Matrix3<f64> =
             Matrix3::from(float_mat.fixed_slice::<3, 3>(0, 0)) / float_mat.m44;
@@ -90,7 +89,9 @@ impl SymmetryAnalyzer {
         let int_trans = CENTERING_TO_PRIM_TRANS
             .get(&bravais_symbol.centering())
             .unwrap();
-        let float_trans = Matrix4::from_iterator(int_trans.iter().map(|&x| x as f64));
+
+        let float_trans = int_trans.as_float();
+
         let prim_transformation: Matrix3<f64> =
             Matrix3::from(float_trans.fixed_slice::<3, 3>(0, 0)) / float_trans.m44;
 
@@ -207,7 +208,7 @@ impl SymmetryAnalyzer {
             .get(&lattice_character)
             .expect("Could not find the appropriate conventional transformation matrix!");
 
-        let float_mat = Matrix3::from_iterator(trans_mat.iter().map(|&x| x as f64));
+        let float_mat = trans_mat.as_float();
 
         reduced_structure.apply_transformation(&float_mat.transpose(), &self.dtol);
 
@@ -219,8 +220,7 @@ impl SymmetryAnalyzer {
             .get(&bravais_symbol.centering())
             .expect("Could not find the appropriate primitive transformation matrix!");
 
-        let float_mat: Matrix4<f64> =
-            Matrix4::from_iterator(prim_trans_mat_int.iter().map(|&x| x as f64));
+        let float_mat = prim_trans_mat_int.as_float();
 
         let prim_trans_mat: Matrix3<f64> =
             Matrix3::from(float_mat.fixed_slice::<3, 3>(0, 0)) / float_mat.m44;
@@ -248,7 +248,7 @@ impl SymmetryAnalyzer {
             .get(&lattice_character)
             .expect("Could not find the appropriate conventional transformation matrix!");
 
-        let float_mat = Matrix3::from_iterator(trans_mat.iter().map(|&x| x as f64));
+        let float_mat = trans_mat.as_float();
 
         reduced_structure.apply_transformation(&float_mat.transpose(), &self.dtol);
 
@@ -448,5 +448,17 @@ impl SymmetryAnalyzer {
         }
 
         return vecs;
+    }
+}
+
+impl MatrixExt<U3, U3, ArrayStorage<f64, 3, 3>> for Matrix3<i8> {
+    fn as_float(&self) -> Matrix3<f64> {
+        return Matrix3::from_iterator(self.iter().map(|&x| x as f64));
+    }
+}
+
+impl MatrixExt<U4, U4, ArrayStorage<f64, 4, 4>> for Matrix4<isize> {
+    fn as_float(&self) -> Matrix4<f64> {
+        return Matrix4::from_iterator(self.iter().map(|&x| x as f64));
     }
 }
