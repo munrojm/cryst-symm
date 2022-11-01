@@ -1,5 +1,5 @@
 use crate::utils::normalize_frac_vectors;
-use nalgebra::{Matrix, Matrix3, Vector3};
+use nalgebra::{Matrix3, Vector3};
 use std::ops::Mul;
 
 #[derive(Debug, Clone)]
@@ -35,8 +35,7 @@ impl Mul for SymmOp {
     fn mul(self, rhs: Self) -> Self {
         let new_rotation = self.rotation * rhs.rotation;
 
-        let float_rotation: Matrix3<f64> =
-            Matrix3::from_iterator(rhs.rotation.iter().map(|&x| x as f64));
+        let float_rotation: Matrix3<f64> = rhs.rotation.cast::<f64>();
 
         let new_translation = (float_rotation * self.translation) + rhs.translation;
 
@@ -55,8 +54,4 @@ impl Mul<Vector3<f64>> for SymmOp {
             Matrix3::from_iterator(self.rotation.iter().map(|&x| x as f64));
         return (float_rotation * rhs) + self.translation;
     }
-}
-
-pub trait MatrixExt<R, C, S> {
-    fn as_float(&self) -> Matrix<f64, R, C, S>;
 }

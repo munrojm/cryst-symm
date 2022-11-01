@@ -7,9 +7,9 @@ use crate::pointgroup::PointGroup;
 use crate::reduce::Reducer;
 use crate::spacegroup::SpaceGroup;
 use crate::structure::Structure;
-use crate::symmop::{MatrixExt, SymmOp};
+use crate::symmop::SymmOp;
 use crate::utils::{cust_eq, normalize_frac_vectors, num_negative_zero};
-use nalgebra::{ArrayStorage, Matrix3, Matrix4, Vector3, U3, U4};
+use nalgebra::{Matrix3, Vector3};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -53,6 +53,7 @@ impl SymmetryAnalyzer {
         let mut sg = SpaceGroup::from_generators(&sg_generators, &frac_tols);
 
         // Put operations back into the basis of the input structure
+        // TODO: Need to fix transforming to the larger cell.
         let niggli_trans_mat = prim_structure.get_transformation_matrix(structure);
 
         let total_trans_mat = niggli_trans_mat * conv_trans_mat * prim_trans_mat;
@@ -82,7 +83,7 @@ impl SymmetryAnalyzer {
             .get(&bravais_symbol.centering())
             .unwrap();
 
-        let float_trans = int_trans.as_float();
+        let float_trans = int_trans.cast::<f64>();
 
         let prim_transformation: Matrix3<f64> =
             Matrix3::from(float_trans.fixed_slice::<3, 3>(0, 0)) / float_trans.m44;
@@ -218,7 +219,7 @@ impl SymmetryAnalyzer {
             .get(&bravais_symbol.centering())
             .expect("Could not find the appropriate primitive transformation matrix!");
 
-        let float_mat = prim_trans_mat_int.as_float();
+        let float_mat = prim_trans_mat_int.cast::<f64>();
 
         let prim_trans_mat: Matrix3<f64> =
             Matrix3::from(float_mat.fixed_slice::<3, 3>(0, 0)) / float_mat.m44;
@@ -255,7 +256,7 @@ impl SymmetryAnalyzer {
             .get(&lattice_character)
             .expect("Could not find the appropriate conventional transformation matrix!");
 
-        let float_mat = trans_mat.as_float();
+        let float_mat = trans_mat.cast::<f64>();
 
         return (float_mat, lattice_character);
     }
@@ -453,17 +454,5 @@ impl SymmetryAnalyzer {
         }
 
         return vecs;
-    }
-}
-
-impl MatrixExt<U3, U3, ArrayStorage<f64, 3, 3>> for Matrix3<i8> {
-    fn as_float(&self) -> Matrix3<f64> {
-        return Matrix3::from_iterator(self.iter().map(|&x| x as f64));
-    }
-}
-
-impl MatrixExt<U4, U4, ArrayStorage<f64, 4, 4>> for Matrix4<isize> {
-    fn as_float(&self) -> Matrix4<f64> {
-        return Matrix4::from_iterator(self.iter().map(|&x| x as f64));
     }
 }
