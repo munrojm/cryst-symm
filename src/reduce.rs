@@ -373,6 +373,7 @@ impl Reducer {
 
         // Construct new structure
         let new_lattice = structure.lattice * transformation;
+        println!("N{:?}", transformation);
 
         // Should coord folding (averaging) need to be considered?
         let new_frac_coords = Structure::get_frac_coords(&new_lattice, &structure.coords);

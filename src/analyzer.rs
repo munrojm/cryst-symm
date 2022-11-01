@@ -30,10 +30,12 @@ impl SymmetryAnalyzer {
 
         let mut reduced_structure = reducer.niggli_reduce(&prim_structure, &1e-5);
 
+        let niggli_structure = reduced_structure.clone();
+
         let (conv_trans_mat, lattice_character) =
             self.conventional_transformation_matrix(&reduced_structure);
 
-        reduced_structure.apply_transformation(&conv_trans_mat.transpose(), &self.dtol); // Standard conventional structure
+        reduced_structure.apply_transformation(&conv_trans_mat, &self.dtol); // Standard conventional structure
 
         let (prim_trans_mat, bravais_symbol) =
             self.primitive_transformation_matrix(&lattice_character);
@@ -53,12 +55,26 @@ impl SymmetryAnalyzer {
         let mut sg = SpaceGroup::from_generators(&sg_generators, &frac_tols);
 
         // Put operations back into the basis of the input structure
-        // TODO: Need to fix transforming to the larger cell.
-        let niggli_trans_mat = prim_structure.get_transformation_matrix(structure);
+        let initial_trans_mat = structure.get_transformation_matrix(&prim_structure);
+        let niggli_trans_mat = prim_structure.get_transformation_matrix(&niggli_structure);
 
-        let total_trans_mat = niggli_trans_mat * conv_trans_mat * prim_trans_mat;
+        let inv_prim_trans_mat = prim_trans_mat
+            .try_inverse()
+            .expect("Primitive transformation is not invertible.");
+        let inv_conv_trans_mat = conv_trans_mat
+            .try_inverse()
+            .expect("Conventional transformation is not invertible.");
+        let inv_niggli_trans_mat = niggli_trans_mat
+            .try_inverse()
+            .expect("Niggli transformation is not invertible.");
+        let inv_initial_trans_mat = initial_trans_mat
+            .try_inverse()
+            .expect("Initial reduction transformation is not invertible.");
 
-        sg.apply_transformation(&total_trans_mat);
+        sg.apply_transformation(&inv_prim_trans_mat);
+        sg.apply_transformation(&inv_conv_trans_mat);
+        sg.apply_transformation(&inv_niggli_trans_mat);
+        sg.apply_transformation(&inv_initial_trans_mat);
 
         return sg;
     }
@@ -198,7 +214,7 @@ impl SymmetryAnalyzer {
         let (trans_mat, lattice_character) =
             self.conventional_transformation_matrix(&reduced_structure);
 
-        reduced_structure.apply_transformation(&trans_mat.transpose(), &self.dtol);
+        reduced_structure.apply_transformation(&trans_mat, &self.dtol);
 
         let (prim_trans_mat, _) = self.primitive_transformation_matrix(&lattice_character);
 
@@ -241,7 +257,7 @@ impl SymmetryAnalyzer {
 
         let (trans_mat, _) = self.conventional_transformation_matrix(&reduced_structure);
 
-        reduced_structure.apply_transformation(&trans_mat.transpose(), &self.dtol);
+        reduced_structure.apply_transformation(&trans_mat, &self.dtol);
 
         return reduced_structure;
     }
@@ -256,7 +272,7 @@ impl SymmetryAnalyzer {
             .get(&lattice_character)
             .expect("Could not find the appropriate conventional transformation matrix!");
 
-        let float_mat = trans_mat.cast::<f64>();
+        let float_mat = trans_mat.cast::<f64>().transpose();
 
         return (float_mat, lattice_character);
     }
