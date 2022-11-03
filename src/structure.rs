@@ -66,16 +66,16 @@ impl Structure {
         }
 
         Self {
-            lattice: lattice,
-            species: species,
+            lattice,
+            species,
             coords: cart_coords,
-            frac_coords: frac_coords,
+            frac_coords,
         }
     }
 
     /// Length of cell vector `a` in angstroms
     pub fn num_sites(&self) -> usize {
-        return self.species.len();
+        self.species.len()
     }
     /// Length of cell vector `a` in angstroms
     pub fn a(&self) -> f64 {
@@ -118,11 +118,11 @@ impl Structure {
 
     /// Volume of the unit cell in angstroms
     pub fn volume(&self) -> f64 {
-        return self.lattice.determinant();
+        self.lattice.determinant()
     }
     /// Metric tensor of lattice matrix
     pub fn metric_tensor(&self) -> Matrix3<f64> {
-        return self.lattice.transpose() * self.lattice;
+        self.lattice.transpose() * self.lattice
     }
 
     /// Applied a transformation to the structure as: `lattice * trans_mat = lattice'`
@@ -137,7 +137,7 @@ impl Structure {
 
         let mut inv_trans_mat: Matrix3<f64> = Matrix3::identity();
 
-        let inverted = try_invert_to(trans_mat.clone(), &mut inv_trans_mat);
+        let inverted = try_invert_to(*trans_mat, &mut inv_trans_mat);
 
         if !inverted {
             panic!("Transformation matrix is not invertible!");
@@ -182,7 +182,7 @@ impl Structure {
                         }
                     }
                     if !eq {
-                        let norm_coord = frac_coord.clone();
+                        let norm_coord = frac_coord;
                         normalize_frac_vectors(&mut vec![norm_coord], &frac_tols);
                         new_frac_coords.push(norm_coord);
                         new_species.push(specie.clone());
@@ -214,9 +214,7 @@ impl Structure {
             .chain([d4])
             .collect();
 
-        let delaunay_mat = Matrix3x4::from_columns(&cols);
-
-        return delaunay_mat;
+        Matrix3x4::from_columns(&cols)
     }
 
     /// Sets a new origin point for the unit cell.
@@ -248,54 +246,47 @@ impl Structure {
         let new_species: Vec<String> = zipped_coords.iter().map(|tuple| tuple.0.clone()).collect();
 
         let new_cart_coords: Vec<Vector3<f64>> =
-            zipped_coords.iter().map(|tuple| tuple.1.clone()).collect();
+            zipped_coords.iter().map(|tuple| *tuple.1).collect();
 
         let new_frac_coords: Vec<Vector3<f64>> =
-            zipped_coords.iter().map(|tuple| tuple.2.clone()).collect();
+            zipped_coords.iter().map(|tuple| *tuple.2).collect();
 
         self.species = new_species;
         self.coords = new_cart_coords;
         self.frac_coords = new_frac_coords;
     }
 
-    pub fn get_cart_coords(
-        lattice: &Matrix3<f64>,
-        coords: &Vec<Vector3<f64>>,
-    ) -> Vec<Vector3<f64>> {
-        let mut new_coords = coords.clone();
+    pub fn get_cart_coords(lattice: &Matrix3<f64>, coords: &[Vector3<f64>]) -> Vec<Vector3<f64>> {
+        let mut new_coords = coords.to_owned();
 
         for (i, coord) in coords.iter().enumerate() {
             new_coords[i] = lattice * coord;
         }
-        return new_coords;
+        new_coords
     }
 
-    pub fn get_frac_coords(
-        lattice: &Matrix3<f64>,
-        coords: &Vec<Vector3<f64>>,
-    ) -> Vec<Vector3<f64>> {
-        let inverted_lattice = lattice
-            .clone()
+    pub fn get_frac_coords(lattice: &Matrix3<f64>, coords: &[Vector3<f64>]) -> Vec<Vector3<f64>> {
+        let inverted_lattice = (*lattice)
             .pseudo_inverse(ZERO_TOL)
             .expect("Crystal lattice is not invertible!");
 
-        let mut new_coords = coords.clone();
+        let mut new_coords = coords.to_owned();
 
         for (i, coord) in coords.iter().enumerate() {
             new_coords[i] = inverted_lattice * coord;
         }
-        return new_coords;
+        new_coords
     }
 
     pub fn reciprocal_lattice(&self) -> Matrix3<f64> {
         let mut reciprocal_lattice = Matrix3::identity();
-        let inverted = try_invert_to(self.lattice.clone(), &mut reciprocal_lattice);
+        let inverted = try_invert_to(self.lattice, &mut reciprocal_lattice);
 
         if !inverted {
             panic!("Crystal lattice is not invertible!");
         }
 
-        return reciprocal_lattice.transpose() * 2.0 * PI;
+        reciprocal_lattice.transpose() * 2.0 * PI
     }
 
     /// Get the element with the smallest amount of sites, alongside an element-site-number map.
@@ -321,7 +312,7 @@ impl Structure {
             .0
             .clone();
 
-        return (min_ele.clone(), ele_inds, type_count);
+        (min_ele.clone(), ele_inds, type_count)
     }
 
     pub fn formulas(&self) -> (String, String) {
@@ -334,7 +325,7 @@ impl Structure {
             *count += 1;
 
             if count > &mut max_count {
-                max_count = count.clone();
+                max_count = *count;
             }
         }
         let mut gcf: i8 = 1;
@@ -356,25 +347,22 @@ impl Structure {
                 formula.push_str(&count.to_string());
             }
 
-            let new_count = &count / &gcf;
+            let new_count = count / gcf;
 
             if new_count != 1 {
                 reduced_formula.push_str(&new_count.to_string());
             }
         }
-        return (formula, reduced_formula);
+        (formula, reduced_formula)
     }
 
     /// Attempts to get the matrix that transforms this structure into the one provided.
     pub fn get_transformation_matrix(&self, structure: &Self) -> Matrix3<f64> {
         let inv_lattice: Matrix3<f64> = self
             .lattice
-            .clone()
             .pseudo_inverse(ZERO_TOL)
             .expect("Crystal lattice is not invertible!");
 
-        let trans_mat = inv_lattice * structure.lattice;
-
-        return trans_mat;
+        inv_lattice * structure.lattice
     }
 }

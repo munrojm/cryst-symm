@@ -11,19 +11,19 @@ pub struct SymmOp {
 impl SymmOp {
     pub fn is_approx_eq(&self, op: &Self, frac_tols: &Vector3<f64>) -> bool {
         let mut diff = vec![self.translation - op.translation];
-        normalize_frac_vectors(&mut diff, &frac_tols);
+        normalize_frac_vectors(&mut diff, frac_tols);
 
         let translation_eq: bool = diff[0]
             .iter()
             .enumerate()
             .all(|(i, val)| val.abs() < frac_tols[i]);
 
-        return (self.rotation == op.rotation) && translation_eq;
+        (self.rotation == op.rotation) && translation_eq
     }
 
     pub fn normalize(&mut self, frac_tols: &Vector3<f64>) {
         let mut new_translation = vec![self.translation];
-        normalize_frac_vectors(&mut new_translation, &frac_tols);
+        normalize_frac_vectors(&mut new_translation, frac_tols);
 
         self.translation = new_translation[0];
     }
@@ -39,10 +39,10 @@ impl Mul for SymmOp {
 
         let new_translation = (float_rotation * self.translation) + rhs.translation;
 
-        return Self {
+        Self {
             rotation: new_rotation,
             translation: new_translation,
-        };
+        }
     }
 }
 
@@ -52,6 +52,6 @@ impl Mul<Vector3<f64>> for SymmOp {
     fn mul(self, rhs: Vector3<f64>) -> Vector3<f64> {
         let float_rotation: Matrix3<f64> =
             Matrix3::from_iterator(self.rotation.iter().map(|&x| x as f64));
-        return (float_rotation * rhs) + self.translation;
+        (float_rotation * rhs) + self.translation
     }
 }

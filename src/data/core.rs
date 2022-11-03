@@ -122,13 +122,13 @@ impl BravaisType {
     pub fn centering(&self) -> Centering {
         let centering: String = self.to_string().chars().last().unwrap().to_string();
 
-        return Centering::from_str(&centering).unwrap();
+        Centering::from_str(&centering).unwrap()
     }
 
     pub fn lattice_system(&self) -> LatticeSystem {
-        let system: String = self.to_string().chars().nth(0).unwrap().to_string();
+        let system: String = self.to_string().chars().next().unwrap().to_string();
 
-        return LatticeSystem::from_str(&system).unwrap();
+        LatticeSystem::from_str(&system).unwrap()
     }
 }
 

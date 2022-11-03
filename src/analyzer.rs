@@ -55,7 +55,7 @@ impl SymmetryAnalyzer {
         let mut sg = SpaceGroup::from_generators(&sg_generators, &frac_tols);
 
         // Put operations back into the basis of the input structure
-        let initial_trans_mat = prim_structure.get_transformation_matrix(&structure);
+        let initial_trans_mat = prim_structure.get_transformation_matrix(structure);
         let niggli_trans_mat = niggli_structure.get_transformation_matrix(&prim_structure);
 
         let inv_prim_trans_mat = prim_trans_mat
@@ -70,7 +70,7 @@ impl SymmetryAnalyzer {
 
         sg.apply_transformation(&total_transformation, &frac_tols);
 
-        return sg;
+        sg
     }
 
     fn get_primitive_space_group_ops(
@@ -184,14 +184,14 @@ impl SymmetryAnalyzer {
                     );
 
                     sg_operations.push(SymmOp {
-                        rotation: op.clone(),
+                        rotation: *op,
                         translation: float_translation,
                     });
                 }
             }
         }
 
-        return sg_operations;
+        sg_operations
     }
 
     /// Obtains the crystallographic primitive crystal structure
@@ -214,7 +214,7 @@ impl SymmetryAnalyzer {
 
         reduced_structure.apply_transformation(&prim_trans_mat, &self.dtol);
 
-        return reduced_structure;
+        reduced_structure
     }
 
     fn primitive_transformation_matrix(
@@ -222,7 +222,7 @@ impl SymmetryAnalyzer {
         lattice_character: &u8,
     ) -> (Matrix3<f64>, &BravaisType) {
         let bravais_symbol = LATTICE_CHAR_TO_BRAVAIS
-            .get(&lattice_character)
+            .get(lattice_character)
             .expect("Could not find the appropriate lattice character or bravais symbol!");
 
         let prim_trans_mat_int = CENTERING_TO_PRIM_TRANS
@@ -234,7 +234,7 @@ impl SymmetryAnalyzer {
         let prim_trans_mat: Matrix3<f64> =
             Matrix3::from(float_mat.fixed_slice::<3, 3>(0, 0)) / float_mat.m44;
 
-        return (prim_trans_mat, bravais_symbol);
+        (prim_trans_mat, bravais_symbol)
     }
 
     /// Obtains the crystallographic standard conventional structure
@@ -253,14 +253,14 @@ impl SymmetryAnalyzer {
 
         reduced_structure.apply_transformation(&trans_mat, &self.dtol);
 
-        return reduced_structure;
+        reduced_structure
     }
 
     fn conventional_transformation_matrix(
         &self,
         reduced_structure: &Structure,
     ) -> (Matrix3<f64>, u8) {
-        let lattice_character = self.get_lattice_character(&reduced_structure, &1e-5);
+        let lattice_character = self.get_lattice_character(reduced_structure, &1e-5);
 
         let trans_mat = LATTICE_CHAR_TO_CONV_TRANS
             .get(&lattice_character)
@@ -268,7 +268,7 @@ impl SymmetryAnalyzer {
 
         let float_mat = trans_mat.cast::<f64>().transpose();
 
-        return (float_mat, lattice_character);
+        (float_mat, lattice_character)
     }
 
     /// Classify the reduced structure accoring to one of the 44 lattice characters.
@@ -290,11 +290,7 @@ impl SymmetryAnalyzer {
         // Count negatives to avoid floating point multiplication
         let (num_negative, num_zero) = num_negative_zero(&vec![d, e, f], &epsilon);
 
-        let type_i = if (num_negative % 2 == 0) && (num_zero == 0) {
-            true
-        } else {
-            false
-        };
+        let type_i = (num_negative % 2 == 0) && (num_zero == 0);
 
         let def = Vector3::new(d, e, f);
 
@@ -329,21 +325,21 @@ impl SymmetryAnalyzer {
             char_num -= 1;
         }
 
-        return if char_num != 0 {
+        if char_num != 0 {
             char_num
         } else {
             panic!("Cannot find lattice character of input structure!")
-        };
+        }
     }
 
     fn extra_eval_a(a: f64, b: f64, d: f64, e: f64, f: f64, epsilon: f64) -> bool {
-        return cust_eq(&((d + e + f).abs() * 2.0), &(a + b), &epsilon);
+        cust_eq(&((d + e + f).abs() * 2.0), &(a + b), &epsilon)
     }
 
     fn extra_eval_b(a: f64, b: f64, d: f64, e: f64, f: f64, epsilon: f64) -> bool {
         let c1 = cust_eq(&((d + e + f).abs() * 2.0), &(a + b), &epsilon);
         let c2 = cust_eq(&((2.0 * d + f).abs()), &b, &epsilon);
-        return c1 && c2;
+        c1 && c2
     }
 
     /// Generate first set of lattice character DEF-vectors corresponding to A=B=C
@@ -371,7 +367,7 @@ impl SymmetryAnalyzer {
             }
         }
 
-        return vecs;
+        vecs
     }
 
     /// Generate second set of lattice character DEF-vectors corresponding to A=B and no conditions on C
@@ -399,7 +395,7 @@ impl SymmetryAnalyzer {
             }
         }
 
-        return vecs;
+        vecs
     }
 
     /// Generate third set of lattice character DEF-vectors corresponding to B=C and no conditions on A
@@ -427,7 +423,7 @@ impl SymmetryAnalyzer {
             vecs.push((Vector3::new(d, e, e), 25));
         }
 
-        return vecs;
+        vecs
     }
 
     /// Generate fourth set of lattice character DEF-vectors corresponding to no conditions on A, B, C
@@ -463,6 +459,6 @@ impl SymmetryAnalyzer {
             vecs.push((Vector3::new(d, e, f), 44));
         }
 
-        return vecs;
+        vecs
     }
 }

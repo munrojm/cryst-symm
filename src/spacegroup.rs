@@ -12,13 +12,13 @@ pub struct SpaceGroup {
 }
 
 impl SpaceGroup {
-    pub fn from_generators(generators: &Vec<SymmOp>, frac_tols: &Vector3<f64>) -> Self {
+    pub fn from_generators(generators: &[SymmOp], frac_tols: &Vector3<f64>) -> Self {
         let symm_ops = Self::ops_from_generators(generators, frac_tols);
 
-        return Self {
+        Self {
             operations: symm_ops,
-            generators: generators.clone(),
-        };
+            generators: generators.to_vec(),
+        }
     }
 
     /// Transform symmetry operations `{R|t} -> {R'|t'}` according to `T^-1 R T = R'` and `T^-1 t = t'`.
@@ -28,7 +28,7 @@ impl SpaceGroup {
         frac_tols: &Vector3<f64>,
     ) {
         let mut inv_trans_mat: Matrix3<f64> = Matrix3::identity();
-        let inverted = try_invert_to(transformation_matrix.clone(), &mut inv_trans_mat);
+        let inverted = try_invert_to(*transformation_matrix, &mut inv_trans_mat);
 
         if !inverted {
             panic!("Transformation matrix is not invertible!");
@@ -76,7 +76,7 @@ impl SpaceGroup {
 
                     for found_trans_vec in found_translation_vecs.iter() {
                         let mut diff = vec![trans_vec[0] - found_trans_vec];
-                        normalize_frac_vectors(&mut diff, &frac_tols);
+                        normalize_frac_vectors(&mut diff, frac_tols);
 
                         let translation_eq: bool = diff[0]
                             .iter()
@@ -89,7 +89,7 @@ impl SpaceGroup {
                     }
 
                     if unique {
-                        normalize_frac_vectors(&mut trans_vec, &frac_tols);
+                        normalize_frac_vectors(&mut trans_vec, frac_tols);
                         let is_zero: bool = trans_vec[0]
                             .iter()
                             .enumerate()
@@ -110,10 +110,10 @@ impl SpaceGroup {
         self.operations = Self::ops_from_generators(&new_generators, frac_tols);
     }
 
-    fn ops_from_generators(generators: &Vec<SymmOp>, frac_tols: &Vector3<f64>) -> Vec<SymmOp> {
-        let mut symm_ops: Vec<SymmOp> = generators.clone();
-        let mut new_ops: Vec<SymmOp> = generators.clone();
-        while new_ops.len() > 0 {
+    fn ops_from_generators(generators: &[SymmOp], frac_tols: &Vector3<f64>) -> Vec<SymmOp> {
+        let mut symm_ops: Vec<SymmOp> = generators.to_vec();
+        let mut new_ops: Vec<SymmOp> = generators.to_vec();
+        while !new_ops.is_empty() {
             let mut generated: Vec<SymmOp> = Vec::new();
 
             for (m1, m2) in iproduct!(symm_ops.clone(), new_ops) {
@@ -131,6 +131,6 @@ impl SpaceGroup {
 
             new_ops = generated;
         }
-        return symm_ops;
+        symm_ops
     }
 }

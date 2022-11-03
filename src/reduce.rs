@@ -1,3 +1,4 @@
+#![allow(clippy::neg_cmp_op_on_partial_ord)]
 use crate::data::core::ZERO_TOL;
 use crate::structure::Structure;
 use crate::utils::{cust_eq, normalize_frac_vectors, num_negative_zero};
@@ -56,10 +57,10 @@ impl Reducer {
         let base_site = temp_structure.frac_coords[*ele_inds.get(&min_ele).unwrap() as usize];
 
         for (coord_ind, coord) in temp_structure.frac_coords.iter().enumerate() {
-            if (&temp_structure.species[coord_ind] == &min_ele)
+            if (temp_structure.species[coord_ind] == min_ele)
                 && (coord_ind != *ele_inds.get(&min_ele).unwrap() as usize)
             {
-                let mut frac_diff = vec![coord - &base_site];
+                let mut frac_diff = vec![coord - base_site];
                 normalize_frac_vectors(&mut frac_diff, &frac_tols);
                 candidate_vecs.push(frac_diff[0]);
             }
@@ -148,7 +149,7 @@ impl Reducer {
             combination_vecs.push(transformed_vec);
             combination_vecs.push(-1.0 * transformed_vec);
 
-            let mut new_vec = transformed_vec.clone();
+            let mut new_vec = transformed_vec;
             new_vec = -1.0 * new_vec;
             if new_vec.magnitude().abs() > ZERO_TOL {
                 combination_vecs.push(new_vec);
@@ -187,7 +188,7 @@ impl Reducer {
                 }
             }
             if !eq {
-                let norm_coord = coord.clone();
+                let norm_coord = *coord;
                 normalize_frac_vectors(&mut vec![norm_coord], &frac_tols);
                 new_frac_coords.push(norm_coord);
                 new_species.push(specie.clone());
@@ -197,7 +198,7 @@ impl Reducer {
         let mut prim_structure = Structure::new(new_lattice, new_species, new_frac_coords, false);
         prim_structure.normalize_coords(&self.dtol);
 
-        return prim_structure;
+        prim_structure
     }
 
     /// Produce a new structure which is Niggli reduced
@@ -232,7 +233,7 @@ impl Reducer {
                 || (cust_eq(&a, &b, &epsilon) && ((xi.abs() - epsilon) > eta.abs()))
             {
                 metric_tensor = c1.transpose() * metric_tensor * c1;
-                transformation = transformation * c1;
+                transformation *= c1;
 
                 (_, b, c, xi, eta, zeta) = (
                     metric_tensor.m11,
@@ -250,7 +251,7 @@ impl Reducer {
                 || ((cust_eq(&b, &c, &epsilon)) && ((eta.abs() - epsilon) > zeta.abs()))
             {
                 metric_tensor = c2.transpose() * metric_tensor * c2;
-                transformation = transformation * c2;
+                transformation *= c2;
                 continue;
             }
 
@@ -304,7 +305,7 @@ impl Reducer {
 
             let c3_4: Matrix3<f64> = Matrix3::new(i, 0.0, 0.0, 0.0, j, 0.0, 0.0, 0.0, k);
             metric_tensor = c3_4.transpose() * metric_tensor * c3_4;
-            transformation = transformation * c3_4;
+            transformation *= c3_4;
 
             (a, b, _, xi, eta, zeta) = (
                 metric_tensor.m11,
@@ -324,7 +325,7 @@ impl Reducer {
                 let c5: Matrix3<f64> =
                     Matrix3::new(1.0, 0.0, 0.0, 0.0, 1.0, -1.0 * xi.signum(), 0.0, 0.0, 1.0);
                 metric_tensor = c5.transpose() * metric_tensor * c5;
-                transformation = transformation * c5;
+                transformation *= c5;
                 continue;
             }
 
@@ -337,7 +338,7 @@ impl Reducer {
                 let c6: Matrix3<f64> =
                     Matrix3::new(1.0, 0.0, -1.0 * eta.signum(), 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
                 metric_tensor = c6.transpose() * metric_tensor * c6;
-                transformation = transformation * c6;
+                transformation *= c6;
                 continue;
             }
 
@@ -350,7 +351,7 @@ impl Reducer {
                 let c7: Matrix3<f64> =
                     Matrix3::new(1.0, -1.0 * zeta.signum(), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
                 metric_tensor = c7.transpose() * metric_tensor * c7;
-                transformation = transformation * c7;
+                transformation *= c7;
                 continue;
             }
 
@@ -364,7 +365,7 @@ impl Reducer {
             {
                 let c8: Matrix3<f64> = Matrix3::new(1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0);
                 metric_tensor = c8.transpose() * metric_tensor * c8;
-                transformation = transformation * c8;
+                transformation *= c8;
                 continue;
             }
 
@@ -386,7 +387,7 @@ impl Reducer {
 
         new_structure.normalize_coords(&self.dtol);
 
-        return new_structure;
+        new_structure
     }
 
     /// Produce a new structure which is Delaunay reduced.
@@ -412,9 +413,9 @@ impl Reducer {
         // Iterate until all scalar prods are <= zero
         while scalar_prods.iter().any(|val| val > &ZERO_TOL) && count <= 100 {
             let mut max_scalar_prod = &0.0;
-            let mut max_index = 0 as usize;
+            let mut max_index = 0_usize;
             for (i, entry) in scalar_prods.iter().enumerate() {
-                if entry > &ZERO_TOL && entry > &max_scalar_prod {
+                if entry > &ZERO_TOL && entry > max_scalar_prod {
                     max_scalar_prod = entry;
                     max_index = i;
                 }
@@ -426,12 +427,12 @@ impl Reducer {
             // e.g. If a*b > 0, the transformation is {a -> a, b -> -b, c -> c+B, d -> d+b}
             for i in 0..4 {
                 if !(pos_pair.0 == i || pos_pair.1 == i) {
-                    let new_col = &delaunay_mat.column(pos_pair.1 as usize)
-                        + &delaunay_mat.column(i as usize);
+                    let new_col =
+                        delaunay_mat.column(pos_pair.1 as usize) + delaunay_mat.column(i as usize);
                     delaunay_mat.set_column(i as usize, &new_col);
                 };
             }
-            let neg_column = &delaunay_mat.column(pos_pair.1 as usize) * (-1.0);
+            let neg_column = delaunay_mat.column(pos_pair.1 as usize) * (-1.0);
             delaunay_mat.set_column(pos_pair.1 as usize, &neg_column);
 
             scalar_prods = Self::get_scalar_prods(&delaunay_mat);
@@ -448,10 +449,8 @@ impl Reducer {
         if full_reduction {
             // New lattice vectors are chosen as shortest from {a, b, c, d, a+b, b+c, c+a}
 
-            let mut base_vecs: Vec<Vector3<f64>> = delaunay_mat
-                .column_iter()
-                .map(|vec| Vector3::from(vec))
-                .collect();
+            let mut base_vecs: Vec<Vector3<f64>> =
+                delaunay_mat.column_iter().map(Vector3::from).collect();
 
             // Sort quadruple to get three shortest vectors
             base_vecs.sort_by(|a, b| a.magnitude().partial_cmp(&b.magnitude()).unwrap());
@@ -491,14 +490,11 @@ impl Reducer {
         new_structure = Structure::new(new_lattice, new_structure.species, new_frac_coords, false);
         new_structure.normalize_coords(&self.dtol);
 
-        return new_structure;
+        new_structure
     }
 
     /// Function to get three shortest (right-handed) cartestian translation vectors which still span the lattice.
-    fn get_shortest_translation_vecs(
-        &self,
-        cart_vecs: &mut Vec<Vector3<f64>>,
-    ) -> Vec<Vector3<f64>> {
+    fn get_shortest_translation_vecs(&self, cart_vecs: &mut [Vector3<f64>]) -> Vec<Vector3<f64>> {
         cart_vecs.sort_by(|a, b| a.magnitude().partial_cmp(&b.magnitude()).unwrap());
 
         let first = cart_vecs[0];
@@ -524,7 +520,7 @@ impl Reducer {
 
         let final_vecs = vec![cart_vecs[0], cart_vecs[second_ind], cart_vecs[third_ind]];
 
-        return final_vecs;
+        final_vecs
     }
 
     fn get_scalar_prods(delaunay_mat: &Matrix3x4<f64>) -> Vector6<f64> {
@@ -536,6 +532,6 @@ impl Reducer {
                 ind += 1;
             }
         }
-        return scalar_prods;
+        scalar_prods
     }
 }
