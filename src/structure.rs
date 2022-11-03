@@ -1,3 +1,4 @@
+use crate::data::core::ZERO_TOL;
 use crate::utils::normalize_frac_vectors;
 use itertools::izip;
 use nalgebra::{try_invert_to, Matrix3, Matrix3x4, Vector3};
@@ -273,14 +274,12 @@ impl Structure {
         lattice: &Matrix3<f64>,
         coords: &Vec<Vector3<f64>>,
     ) -> Vec<Vector3<f64>> {
-        let mut inverted_lattice = Matrix3::identity();
+        let inverted_lattice = lattice
+            .clone()
+            .pseudo_inverse(ZERO_TOL)
+            .expect("Crystal lattice is not invertible!");
+
         let mut new_coords = coords.clone();
-
-        let inverted = try_invert_to(lattice.clone(), &mut inverted_lattice);
-
-        if !inverted {
-            panic!("Crystal lattice is not invertible!");
-        }
 
         for (i, coord) in coords.iter().enumerate() {
             new_coords[i] = inverted_lattice * coord;
@@ -368,13 +367,11 @@ impl Structure {
 
     /// Attempts to get the matrix that transforms this structure into the one provided.
     pub fn get_transformation_matrix(&self, structure: &Self) -> Matrix3<f64> {
-        let mut inv_lattice: Matrix3<f64> = Matrix3::identity();
-
-        let inverted = try_invert_to(self.lattice.clone(), &mut inv_lattice);
-
-        if !inverted {
-            panic!("Lattice matrix is not invertible!");
-        }
+        let inv_lattice: Matrix3<f64> = self
+            .lattice
+            .clone()
+            .pseudo_inverse(ZERO_TOL)
+            .expect("Crystal lattice is not invertible!");
 
         let trans_mat = inv_lattice * structure.lattice;
 

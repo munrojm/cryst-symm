@@ -55,8 +55,8 @@ impl SymmetryAnalyzer {
         let mut sg = SpaceGroup::from_generators(&sg_generators, &frac_tols);
 
         // Put operations back into the basis of the input structure
-        let initial_trans_mat = structure.get_transformation_matrix(&prim_structure);
-        let niggli_trans_mat = prim_structure.get_transformation_matrix(&niggli_structure);
+        let initial_trans_mat = prim_structure.get_transformation_matrix(&structure);
+        let niggli_trans_mat = niggli_structure.get_transformation_matrix(&prim_structure);
 
         let inv_prim_trans_mat = prim_trans_mat
             .try_inverse()
@@ -64,17 +64,11 @@ impl SymmetryAnalyzer {
         let inv_conv_trans_mat = conv_trans_mat
             .try_inverse()
             .expect("Conventional transformation is not invertible.");
-        let inv_niggli_trans_mat = niggli_trans_mat
-            .try_inverse()
-            .expect("Niggli transformation is not invertible.");
-        let inv_initial_trans_mat = initial_trans_mat
-            .try_inverse()
-            .expect("Initial reduction transformation is not invertible.");
 
-        sg.apply_transformation(&inv_prim_trans_mat);
-        sg.apply_transformation(&inv_conv_trans_mat);
-        sg.apply_transformation(&inv_niggli_trans_mat);
-        sg.apply_transformation(&inv_initial_trans_mat);
+        let total_transformation =
+            inv_prim_trans_mat * inv_conv_trans_mat * niggli_trans_mat * initial_trans_mat;
+
+        sg.apply_transformation(&total_transformation, &frac_tols);
 
         return sg;
     }
