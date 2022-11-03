@@ -46,11 +46,11 @@ fn generate_output_structure_data(structure: Structure) -> (Vec<f64>, PyObject, 
     let coords_vecs = vec![0; structure.frac_coords.len()];
     let coords_vecs = PyList::new(py, &coords_vecs);
 
-    for (ind, vec) in structure.frac_coords.iter().enumerate() {
+    for vec in structure.frac_coords.iter() {
         let new_vec = PyList::new(py, vec.iter());
         coords_vecs
-            .set_item(ind, new_vec)
-            .expect("Could not append coordinate vector to PyList.");
+            .append(new_vec)
+            .expect("Could not append coordinate vector to PyList");
     }
 
     (
@@ -109,33 +109,21 @@ fn get_space_group_operations(
     coords_are_cart: bool,
     dtol: f64,
     atol: f64,
-) -> PyResult<(PyObject, PyObject)> {
+) -> PyResult<Vec<(Vec<i8>, Vec<f64>)>> {
     let structure = generate_input_structure(lattice, species, coords, coords_are_cart);
 
     let sa = SymmetryAnalyzer { dtol, atol };
 
     let space_group = sa.get_space_group_operations(&structure);
 
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    let dummy_list = vec![0; space_group.operations.len()];
-    let op_list = PyList::new(py, &dummy_list);
-    let vec_list = PyList::new(py, &dummy_list);
-
-    for (ind, symm_op) in space_group.operations.iter().enumerate() {
-        let mat = PyList::new(py, symm_op.rotation.transpose().iter());
-        let vec = PyList::new(py, symm_op.translation.iter());
-
-        op_list
-            .set_item(ind, mat)
-            .expect("Could not create PyList of space group rotations.");
-
-        vec_list
-            .set_item(ind, vec)
-            .expect("Could not create PyList of space group translations.");
+    let mut op_list: Vec<(Vec<i8>, Vec<f64>)> = Vec::new();
+    for symm_op in space_group.operations.iter() {
+        let mat_list: Vec<i8> = symm_op.rotation.transpose().iter().copied().collect();
+        let vec_list: Vec<f64> = symm_op.translation.iter().copied().collect();
+        op_list.push((mat_list, vec_list));
     }
 
-    Ok((op_list.to_object(py), vec_list.to_object(py)))
+    Ok(op_list)
 }
 
 #[pyfunction]
