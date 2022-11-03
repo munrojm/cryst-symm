@@ -535,3 +535,12 @@ impl Reducer {
         scalar_prods
     }
 }
+
+impl Default for Reducer {
+    fn default() -> Reducer {
+        Self {
+            dtol: 0.05,
+            atol: 5.0,
+        }
+    }
+}
