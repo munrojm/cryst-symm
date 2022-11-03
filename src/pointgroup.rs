@@ -47,13 +47,13 @@ impl PointGroup {
         for op in self.operations.iter_mut() {
             let mut float_op = op.cast::<f64>();
             float_op = inv_trans_mat * float_op * transformation_matrix;
-            *op = Matrix3::from_iterator(float_op.iter().map(|&x| x as i8));
+            *op = Matrix3::from_iterator(float_op.iter().map(|&x| x.round() as i8));
         }
 
         for op in self.generators.iter_mut() {
             let mut float_op = op.cast::<f64>();
             float_op = inv_trans_mat * float_op * transformation_matrix;
-            *op = Matrix3::from_iterator(float_op.iter().map(|&x| x as i8));
+            *op = Matrix3::from_iterator(float_op.iter().map(|&x| x.round() as i8));
         }
     }
 
