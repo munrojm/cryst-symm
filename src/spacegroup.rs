@@ -8,7 +8,6 @@ use nalgebra::{try_invert_to, Matrix3};
 #[derive(Debug)]
 pub struct SpaceGroup {
     pub operations: Vec<SymmOp>,
-    pub generators: Vec<SymmOp>,
 }
 
 impl SpaceGroup {
@@ -17,7 +16,6 @@ impl SpaceGroup {
 
         Self {
             operations: symm_ops,
-            generators: generators.to_vec(),
         }
     }
 
@@ -34,7 +32,7 @@ impl SpaceGroup {
             panic!("Transformation matrix is not invertible!");
         }
 
-        for op in self.generators.iter_mut() {
+        for op in self.operations.iter_mut() {
             let mut float_rot = op.rotation.cast::<f64>();
 
             float_rot = inv_trans_mat * float_rot * transformation_matrix;
@@ -46,13 +44,13 @@ impl SpaceGroup {
             op.rotation = Matrix3::from_iterator(float_rot.iter().map(|&x| x.round() as i8));
         }
 
-        //Find extra unit translations included in new cell if it is bigger (this is broken...)
+        //Find extra unit translations included in new cell if it is bigger
 
         let volume_ratio = transformation_matrix.determinant().abs().round();
 
-        let mut new_generators = self.generators.clone();
+        let mut new_operations = self.operations.clone();
 
-        while (new_generators.len() as f64 / self.generators.len() as f64)
+        while (new_operations.len() as f64 / self.operations.len() as f64)
             < (volume_ratio - ZERO_TOL)
         {
             let translation_vecs: Vec<Vector3<f64>> = vec![
@@ -65,7 +63,7 @@ impl SpaceGroup {
                 Vector3::new(1.0, 1.0, 1.0),
             ];
 
-            let original_ops = self.generators.clone();
+            let original_ops = self.operations.clone();
 
             for op in original_ops.iter() {
                 let mut found_translation_vecs: Vec<Vector3<f64>> = vec![op.translation];
@@ -101,13 +99,13 @@ impl SpaceGroup {
                             // Add new ops to group
                             let mut new_op = op.clone();
                             new_op.translation = trans_vec[0];
-                            new_generators.push(new_op)
+                            new_operations.push(new_op)
                         }
                     }
                 }
             }
         }
-        self.operations = Self::ops_from_generators(&new_generators, frac_tols);
+        self.operations = new_operations;
     }
 
     fn ops_from_generators(generators: &[SymmOp], frac_tols: &Vector3<f64>) -> Vec<SymmOp> {

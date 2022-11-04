@@ -29,7 +29,7 @@ fn main() {
         atol: 5.0,
     };
 
-    let tmat = Matrix3::new(2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0);
+    let tmat = Matrix3::new(4.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 4.0);
 
     structure.apply_transformation(&tmat, &0.05);
 

@@ -14,7 +14,7 @@ crate-type = ["cdylib", "lib"]
 nalgebra = "0.31.3"
 lazy_static = "1.4.0"
 itertools = "0.10.3"
-pyo3 = { version = "0.16.5", features = ["extension-module"] }
+pyo3 = { version = "0.17.3", features = ["extension-module"] }
 
 
 [dev-dependencies]
@@ -23,3 +23,6 @@ criterion = "0.4"
 [[bench]]
 name = "benchmark"
 harness = false
+
+[profile.bench]
+debug = true
