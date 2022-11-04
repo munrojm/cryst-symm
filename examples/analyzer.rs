@@ -1,7 +1,8 @@
+use crystsymm::analyzer::SymmetryAnalyzer;
 use crystsymm::structure::Structure;
 use nalgebra::{Matrix3, Vector3};
 
-fn main() {
+fn create_structure() -> Structure {
     let a = Vector3::new(-3.748244, 0.0, 0.0);
     let b = Vector3::new(1.874122, -4.750729, 0.0);
     let c = Vector3::new(0.0, 1.5562529, 6.25794799);
@@ -18,4 +19,21 @@ fn main() {
     ];
 
     let s = Structure::new(lattice, species, coords, true);
+    s
+}
+
+fn main() {
+    let mut structure = create_structure();
+    let sa = SymmetryAnalyzer {
+        dtol: 0.05,
+        atol: 5.0,
+    };
+
+    let tmat = Matrix3::new(2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0);
+
+    structure.apply_transformation(&tmat, &0.05);
+
+    let sg = sa.get_space_group_operations(&structure);
+
+    println!("{:#?}", sg);
 }
