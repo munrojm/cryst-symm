@@ -12,7 +12,7 @@ use nalgebra::{Matrix3, Vector3};
 use reduce::Reducer;
 use structure::Structure;
 
-use pyo3::{prelude::*, types::PyList};
+use pyo3::prelude::*;
 
 fn generate_input_structure(
     lattice: Vec<f64>,
@@ -35,29 +35,17 @@ fn generate_input_structure(
     )
 }
 
-fn generate_output_structure_data(structure: Structure) -> (Vec<f64>, PyObject, PyObject) {
+fn generate_output_structure_data(structure: Structure) -> (Vec<f64>, Vec<String>, Vec<Vec<f64>>) {
     let lattice_vec: Vec<f64> = structure.lattice.iter().copied().collect();
 
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-
-    let species = PyList::new(py, structure.species.iter());
-
-    let coords_vecs = vec![0; structure.frac_coords.len()];
-    let coords_vecs = PyList::new(py, &coords_vecs);
+    let mut coords_vecs: Vec<Vec<f64>> = Vec::new();
 
     for vec in structure.frac_coords.iter() {
-        let new_vec = PyList::new(py, vec.iter());
-        coords_vecs
-            .append(new_vec)
-            .expect("Could not append coordinate vector to PyList");
+        let new_vec: Vec<f64> = Vec::from_iter(vec.iter().copied());
+        coords_vecs.push(new_vec);
     }
 
-    (
-        lattice_vec,
-        species.to_object(py),
-        coords_vecs.to_object(py),
-    )
+    (lattice_vec, structure.species, coords_vecs)
 }
 
 #[pyfunction]
@@ -68,7 +56,7 @@ fn find_primitive(
     coords_are_cart: bool,
     dtol: f64,
     atol: f64,
-) -> PyResult<(Vec<f64>, PyObject, PyObject)> {
+) -> PyResult<(Vec<f64>, Vec<String>, Vec<Vec<f64>>)> {
     let structure = generate_input_structure(lattice, species, coords, coords_are_cart);
 
     let reducer = Reducer { dtol, atol };
@@ -87,7 +75,7 @@ fn niggli_reduce(
     coords: Vec<Vec<f64>>,
     coords_are_cart: bool,
     tol: f64,
-) -> PyResult<(Vec<f64>, PyObject, PyObject)> {
+) -> PyResult<(Vec<f64>, Vec<String>, Vec<Vec<f64>>)> {
     let structure = generate_input_structure(lattice, species, coords, coords_are_cart);
 
     let reducer = Reducer {
@@ -134,7 +122,7 @@ fn get_standard_conventional_structure(
     coords_are_cart: bool,
     dtol: f64,
     atol: f64,
-) -> PyResult<(Vec<f64>, PyObject, PyObject)> {
+) -> PyResult<(Vec<f64>, Vec<String>, Vec<Vec<f64>>)> {
     let structure = generate_input_structure(lattice, species, coords, coords_are_cart);
 
     let sa = SymmetryAnalyzer { dtol, atol };
@@ -153,7 +141,7 @@ fn get_standard_primitive_structure(
     coords_are_cart: bool,
     dtol: f64,
     atol: f64,
-) -> PyResult<(Vec<f64>, PyObject, PyObject)> {
+) -> PyResult<(Vec<f64>, Vec<String>, Vec<Vec<f64>>)> {
     let structure = generate_input_structure(lattice, species, coords, coords_are_cart);
 
     let sa = SymmetryAnalyzer { dtol, atol };
