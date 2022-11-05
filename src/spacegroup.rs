@@ -59,11 +59,6 @@ impl SpaceGroup {
                 let mut float_rot = op.rotation.cast::<f64>();
                 float_rot = inv_trans_mat * float_rot * transformation_matrix;
 
-                let frac_test: Vec<f64> = float_rot
-                    .iter()
-                    .map(|val| (val.abs() + ZERO_TOL).fract())
-                    .collect();
-
                 // Throw out non-integer rotation matrices
                 if float_rot
                     .iter()
