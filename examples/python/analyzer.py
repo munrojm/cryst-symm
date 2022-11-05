@@ -1,5 +1,4 @@
 from crystsymm import get_space_group_operations
-from time import perf_counter_ns
 
 lattice = [0.0, 28.504374, 0.0, 7.496488, 0.0, 0.0, 0.0, -3.1125059999999993, -12.515895999999998]
 

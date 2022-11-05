@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::data::core::ZERO_TOL;
 use crate::symmop::SymmOp;
 use crate::utils::normalize_frac_vectors;
@@ -32,47 +34,53 @@ impl SpaceGroup {
             panic!("Transformation matrix is not invertible!");
         }
 
-        for op in self.operations.iter_mut() {
-            let mut float_rot = op.rotation.cast::<f64>();
+        // Find extra unit translations included in new cell if it is bigger
 
-            float_rot = inv_trans_mat * float_rot * transformation_matrix;
+        let volume_ratio = (transformation_matrix.determinant().abs() * 100.0).round() / 100.0;
 
-            let mut float_trans = vec![inv_trans_mat * op.translation];
-            normalize_frac_vectors(&mut float_trans, frac_tols);
+        let mut new_operations: Vec<SymmOp> = Vec::new();
 
-            op.translation = float_trans[0];
-            op.rotation = Matrix3::from_iterator(float_rot.iter().map(|&x| x.round() as i8));
-        }
+        // Set up found vector mapping
+        let mut found_vectors_mapping: HashMap<Matrix3<i8>, Vec<Vector3<f64>>> = HashMap::new();
 
-        //Find extra unit translations included in new cell if it is bigger
+        let mut initial_num_ops = self.operations.len() as f64;
 
-        let volume_ratio = transformation_matrix.determinant().abs().round();
+        let mut mult = 2;
+        while (new_operations.len() as f64 / initial_num_ops) < volume_ratio {
+            let mut translation_vecs: Vec<Vector3<f64>> = Vec::new();
 
-        let mut new_operations = self.operations.clone();
+            // Generate unit translation vectors
+            for (i, j, k) in iproduct!(0..mult, 0..mult, 0..mult) {
+                translation_vecs.push(Vector3::new(i as f64, j as f64, k as f64))
+            }
 
-        while (new_operations.len() as f64 / self.operations.len() as f64)
-            < (volume_ratio - ZERO_TOL)
-        {
-            let translation_vecs: Vec<Vector3<f64>> = vec![
-                Vector3::new(1.0, 0.0, 0.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector3::new(0.0, 0.0, 1.0),
-                Vector3::new(1.0, 1.0, 0.0),
-                Vector3::new(0.0, 1.0, 1.0),
-                Vector3::new(1.0, 0.0, 1.0),
-                Vector3::new(1.0, 1.0, 1.0),
-            ];
+            for op in self.operations.iter() {
+                // Calculate transformed rotation matrix
+                let mut float_rot = op.rotation.cast::<f64>();
+                float_rot = inv_trans_mat * float_rot * transformation_matrix;
 
-            let original_ops = self.operations.clone();
+                // Throw out non-integer rotation matrices
+                if float_rot.iter().any(|val| val.fract().abs() > ZERO_TOL) {
+                    initial_num_ops -= 1.0;
+                    continue;
+                }
 
-            for op in original_ops.iter() {
-                let mut found_translation_vecs: Vec<Vector3<f64>> = vec![op.translation];
+                let trans_rotation =
+                    Matrix3::from_iterator(float_rot.iter().map(|&x| x.round() as i8));
 
+                // Iterate through candidate transformed translation vector for a specific symm op
+                // and check if it has been seen before. If not, add it to the list of new operations.
                 for vec in translation_vecs.iter() {
-                    let mut trans_vec = vec![inv_trans_mat * (vec + op.translation)];
+                    let mut trans_vec = vec![inv_trans_mat * (op.translation + vec)];
+                    normalize_frac_vectors(&mut trans_vec, frac_tols);
+
                     let mut unique = true;
 
-                    for found_trans_vec in found_translation_vecs.iter() {
+                    for found_trans_vec in found_vectors_mapping
+                        .entry(trans_rotation)
+                        .or_default()
+                        .iter()
+                    {
                         let mut diff = vec![trans_vec[0] - found_trans_vec];
                         normalize_frac_vectors(&mut diff, frac_tols);
 
@@ -83,27 +91,26 @@ impl SpaceGroup {
 
                         if translation_eq {
                             unique = false;
+                            break;
                         }
                     }
 
                     if unique {
                         normalize_frac_vectors(&mut trans_vec, frac_tols);
-                        let is_zero: bool = trans_vec[0]
-                            .iter()
-                            .enumerate()
-                            .all(|(i, val)| val.abs() < frac_tols[i]);
+                        found_vectors_mapping
+                            .entry(trans_rotation)
+                            .or_insert(Vec::new())
+                            .push(trans_vec[0]);
 
-                        if !is_zero {
-                            found_translation_vecs.push(trans_vec[0]);
-
-                            // Add new ops to group
-                            let mut new_op = op.clone();
-                            new_op.translation = trans_vec[0];
-                            new_operations.push(new_op)
-                        }
+                        // Add new ops to group
+                        let mut new_op = op.clone();
+                        new_op.translation = trans_vec[0];
+                        new_op.rotation = trans_rotation;
+                        new_operations.push(new_op)
                     }
                 }
             }
+            mult += 1;
         }
         self.operations = new_operations;
     }

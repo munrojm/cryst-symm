@@ -1,6 +1,6 @@
 use crate::data::core::ZERO_TOL;
 use crate::utils::normalize_frac_vectors;
-use itertools::izip;
+use itertools::{iproduct, izip};
 use nalgebra::{try_invert_to, Matrix3, Matrix3x4, Vector3};
 use std::collections::HashMap;
 use std::f64::consts::PI;
@@ -148,22 +148,17 @@ impl Structure {
         let mut new_frac_coords: Vec<Vector3<f64>> = Vec::new();
         let mut new_species: Vec<String> = Vec::new();
 
-        let translation_vecs: Vec<Vector3<f64>> = vec![
-            Vector3::new(1.0, 0.0, 0.0),
-            Vector3::new(0.0, 1.0, 0.0),
-            Vector3::new(0.0, 0.0, 1.0),
-            Vector3::new(1.0, 1.0, 0.0),
-            Vector3::new(0.0, 1.0, 1.0),
-            Vector3::new(1.0, 0.0, 1.0),
-            Vector3::new(1.0, 1.0, 1.0),
-        ];
-
-        let volume_ratio = trans_mat.determinant().abs();
+        let volume_ratio = (trans_mat.determinant().abs() * 100.0).round() / 100.0;
 
         // Search for new sites in transformed cell using volume ratio to determine proper number of sites
-        let mut mult = 0;
-        while (new_frac_coords.len() as f64 / self.coords.len() as f64) < volume_ratio && mult <= 10
-        {
+        let mut mult = 2;
+        while (new_frac_coords.len() as f64 / self.coords.len() as f64) < volume_ratio {
+            let mut translation_vecs: Vec<Vector3<f64>> = Vec::new();
+
+            for (i, j, k) in iproduct!(0..mult, 0..mult, 0..mult) {
+                translation_vecs.push(Vector3::new(i as f64, j as f64, k as f64))
+            }
+
             for (coord, specie) in self.frac_coords.iter().zip(&self.species) {
                 for translation_vec in translation_vecs.iter() {
                     let mut frac_coord = *coord + (translation_vec * mult as f64);
@@ -190,10 +185,6 @@ impl Structure {
                 }
             }
             mult += 1;
-        }
-
-        if mult == 10 {
-            panic!("Could not find all atomic sites in larger transformed cell.");
         }
 
         self.lattice = new_lattice;
