@@ -60,9 +60,9 @@ impl SpaceGroup {
                 float_rot = inv_trans_mat * float_rot * transformation_matrix;
 
                 // Throw out non-integer rotation matrices
-                if float_rot
+                if !float_rot
                     .iter()
-                    .any(|val| (val.abs() + ZERO_TOL).fract() > ZERO_TOL)
+                    .any(|val| (val.abs() < ZERO_TOL) || ((val.abs() - 1.0).abs() < ZERO_TOL))
                 {
                     initial_num_ops -= 1.0;
                     continue;
