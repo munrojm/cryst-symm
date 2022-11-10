@@ -97,7 +97,7 @@ mod tests {
 
     #[test]
     fn test_symm_ops() {
-        let (mut symm_op_1, symm_op_2) = generate_symm_ops();
+        let (mut symm_op_1, _) = generate_symm_ops();
 
         let frac_tols = Vector3::new(1e-3, 1e-3, 1e-3);
 
@@ -109,7 +109,10 @@ mod tests {
             &1e-4
         ));
 
-        assert!(symm_op_1.is_approx_eq(&symm_op_2, &frac_tols));
+        let mut new_symm_op_1 = symm_op_1.clone();
+        new_symm_op_1.translation = Vector3::new(0.9999, 0.4999, 0.25001);
+
+        assert!(symm_op_1.is_approx_eq(&new_symm_op_1, &frac_tols));
     }
 
     #[test]
