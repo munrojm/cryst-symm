@@ -399,6 +399,8 @@ impl Reducer {
 
     /// Produce a new structure which is Delaunay reduced.
     ///
+    /// **NOTE**: This method may need some changes. Use with caution.
+    ///
     /// # Arguments
     ///
     /// * `structure` - Input structure to reduce.
@@ -561,9 +563,8 @@ impl Default for Reducer {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::approx_equal_iter;
-
     use super::*;
+    use crate::utils::approx_equal_iter;
 
     fn generate_structure() -> Structure {
         let a = Vector3::new(-3.748244, 0.0, 0.0);
@@ -621,6 +622,24 @@ mod tests {
             niggli_s.lattice.iter(),
             Matrix3::new(-3.748244, 1.874122, 0.0, 0.0, 4.750729, -1.556253, 0.0, 0.0, -6.257948)
                 .iter(),
+            &ZERO_TOL
+        ));
+    }
+
+    #[test]
+    fn test_delaunay_reduce() {
+        let s = generate_structure();
+        let r = generate_reducer();
+
+        let prim_s = r.find_primitive_cell(&s);
+        let delaunay_s = r.delaunay_reduce(&prim_s, true);
+
+        assert!(approx_equal_iter(
+            delaunay_s.lattice.iter(),
+            Matrix3::new(
+                -3.748244, -1.874122, -1.874122, 0.0, 4.750729, 3.1944761, 0.0, 0.0, -6.257948
+            )
+            .iter(),
             &ZERO_TOL
         ));
     }
