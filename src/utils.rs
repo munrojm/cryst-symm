@@ -82,11 +82,7 @@ pub fn approx_equal(a: &f64, b: &f64, tol: &f64) -> bool {
     (a - b).abs() < *tol
 }
 
-pub fn approx_equal_iter(
-    a: impl ExactSizeIterator<Item = f64>,
-    b: impl ExactSizeIterator<Item = f64>,
-    tol: &f64,
-) -> bool {
+pub fn approx_equal_iter<'a, T: ExactSizeIterator<Item = &'a f64>>(a: T, b: T, tol: &f64) -> bool {
     let a = a.into_iter();
     let b = b.into_iter();
 

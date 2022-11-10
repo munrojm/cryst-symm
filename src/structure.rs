@@ -442,8 +442,8 @@ mod tests {
         ];
 
         assert!(approx_equal_iter(
-            real_scalars.into_iter(),
-            test_scalars.into_iter(),
+            real_scalars.iter(),
+            test_scalars.iter(),
             &ZERO_TOL
         ));
     }
@@ -484,7 +484,7 @@ mod tests {
         let s = generate_structure();
 
         assert!(approx_equal_iter(
-            s.metric_tensor().into_iter().copied(),
+            s.metric_tensor().iter(),
             Matrix3::new(
                 14.04933308,
                 -7.02466654,
@@ -496,8 +496,7 @@ mod tests {
                 -7.39333626,
                 41.58383657
             )
-            .into_iter()
-            .copied(),
+            .iter(),
             &ZERO_TOL
         ));
     }
@@ -507,7 +506,7 @@ mod tests {
         let s = generate_structure();
 
         assert!(approx_equal_iter(
-            s.reciprocal_lattice().into_iter().copied(),
+            s.reciprocal_lattice().iter(),
             Matrix3::new(
                 -1.67630104,
                 -0.66128644,
@@ -520,8 +519,7 @@ mod tests {
                 1.00403284
             )
             .transpose()
-            .into_iter()
-            .copied(),
+            .iter(),
             &ZERO_TOL
         ));
     }
@@ -531,7 +529,7 @@ mod tests {
         let s = generate_structure();
 
         assert!(approx_equal_iter(
-            s.delaunay_matrix().into_iter().copied(),
+            s.delaunay_matrix().iter(),
             Matrix3x4::new(
                 -3.748244,
                 1.874122,
@@ -546,8 +544,7 @@ mod tests {
                 6.25794799,
                 -6.25794799
             )
-            .into_iter()
-            .copied(),
+            .iter(),
             &ZERO_TOL
         ));
     }
@@ -566,11 +563,7 @@ mod tests {
         ];
 
         for (real, test) in cart_coords.into_iter().zip(test_coords) {
-            assert!(approx_equal_iter(
-                real.iter().copied(),
-                test.iter().copied(),
-                &1e-4
-            ));
+            assert!(approx_equal_iter(real.iter(), test.iter(), &1e-4));
         }
     }
 
@@ -588,11 +581,7 @@ mod tests {
         ];
 
         for (real, test) in frac_coords.into_iter().zip(test_coords) {
-            assert!(approx_equal_iter(
-                real.iter().copied(),
-                test.iter().copied(),
-                &1e-4
-            ));
+            assert!(approx_equal_iter(real.iter(), test.iter(), &1e-4));
         }
     }
 
@@ -616,14 +605,10 @@ mod tests {
 
         s.frac_coords = test_coords;
 
-        s.normalize_coords(&0.1);
+        s.normalize_coords(&0.05);
 
         for (real, test) in s.frac_coords.into_iter().zip(real_coords) {
-            assert!(approx_equal_iter(
-                real.iter().copied(),
-                test.iter().copied(),
-                &1e-4
-            ));
+            assert!(approx_equal_iter(real.iter(), test.iter(), &1e-4));
         }
     }
 
@@ -636,10 +621,9 @@ mod tests {
         s.apply_transformation(&trans_mat, &0.01);
 
         assert!(approx_equal_iter(
-            s.lattice.into_iter().copied(),
+            s.lattice.iter(),
             Matrix3::new(-7.496488, -1.874122, 0.0, 0.0, -4.750729, 1.556253, 0.0, 0.0, 6.257948)
-                .into_iter()
-                .copied(),
+                .iter(),
             &ZERO_TOL
         ));
     }
@@ -651,13 +635,13 @@ mod tests {
 
         let trans_mat = Matrix3::new(2.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
 
-        trans_s.apply_transformation(&trans_mat, &0.1);
+        trans_s.apply_transformation(&trans_mat, &0.05);
 
         let recovered_mat = s.get_transformation_matrix(&trans_s);
 
         assert!(approx_equal_iter(
-            recovered_mat.into_iter().copied(),
-            trans_mat.into_iter().copied(),
+            recovered_mat.iter(),
+            trans_mat.iter(),
             &ZERO_TOL
         ));
     }

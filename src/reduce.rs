@@ -20,6 +20,9 @@ impl Reducer {
     /// 3. Select three shortest vectors which span the lattice.
     /// 4. Create new structure and fold atomic sites into new smaller cell.
     ///
+    /// # Arguments
+    ///
+    /// * `structure` - Input structure to reduce.
     pub fn find_primitive_cell(&self, structure: &Structure) -> Structure {
         let mut temp_structure = structure.clone();
 
@@ -204,6 +207,10 @@ impl Reducer {
     /// Produce a new structure which is Niggli reduced
     /// using the algorithm by Grosse-Kuntsleve et al.
     /// [Acta Cryst. (2004). A60, 1-6](https://doi.org/10.1107/S010876730302186X)
+    /// # Arguments
+    ///
+    /// * `structure` - Input structure to reduce.
+    /// * `tol` - Value used to calculate tolerance (eps) as `eps = tol*(volume^(1/3))`
     pub fn niggli_reduce(&self, structure: &Structure, tol: &f64) -> Structure {
         let epsilon = tol * structure.volume().powf(1.0 / 3.0);
 
@@ -391,6 +398,12 @@ impl Reducer {
     }
 
     /// Produce a new structure which is Delaunay reduced.
+    ///
+    /// # Arguments
+    ///
+    /// * `structure` - Input structure to reduce.
+    /// * `full_reduction` - Whether to choose the shortest vectors after Delaunay reduction for the new structure.
+    /// If not, outputs the lattice directly after the Delaunay algorithm.
     pub fn delaunay_reduce(&self, structure: &Structure, full_reduction: bool) -> Structure {
         let mut new_structure = structure.clone();
 
@@ -523,6 +536,7 @@ impl Reducer {
         final_vecs
     }
 
+    /// Function to get scalar products from the Delaunay matrix
     fn get_scalar_prods(delaunay_mat: &Matrix3x4<f64>) -> Vector6<f64> {
         let mut scalar_prods: Vector6<f64> = Vector6::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         let mut ind = 0;
@@ -542,5 +556,72 @@ impl Default for Reducer {
             dtol: 0.05,
             atol: 5.0,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::utils::approx_equal_iter;
+
+    use super::*;
+
+    fn generate_structure() -> Structure {
+        let a = Vector3::new(-3.748244, 0.0, 0.0);
+        let b = Vector3::new(1.874122, -4.750729, 0.0);
+        let c = Vector3::new(0.0, 1.5562529, 6.25794799);
+
+        let lattice = Matrix3::from_columns(&[a, b, c]);
+
+        let elements = ["Au", "Au", "Se", "Se"];
+        let species: Vec<String> = elements.iter().map(|s| s.to_string()).collect();
+        let coords = vec![
+            Vector3::new(-1.8741, 0.7781, 3.1290),
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(-1.8741, -3.0213, 1.7273),
+            Vector3::new(0.0, -0.1732, 4.5307),
+        ];
+
+        Structure::new(lattice, species, coords, true)
+    }
+
+    fn generate_reducer() -> Reducer {
+        Reducer {
+            ..Reducer::default()
+        }
+    }
+
+    #[test]
+    fn test_find_primitive() {
+        let s = generate_structure();
+        let mut supercell = s.clone();
+        let transformation_matrix = Matrix3::new(2.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 2.0);
+
+        let r = generate_reducer();
+
+        supercell.apply_transformation(&transformation_matrix, &0.05);
+
+        let prim_s = r.find_primitive_cell(&supercell);
+
+        assert!(approx_equal_iter(
+            s.lattice.iter(),
+            prim_s.lattice.iter(),
+            &ZERO_TOL
+        ));
+    }
+
+    #[test]
+    fn test_niggli_reduce() {
+        let s = generate_structure();
+        let r = generate_reducer();
+
+        let prim_s = r.find_primitive_cell(&s);
+        let niggli_s = r.niggli_reduce(&prim_s, &1e-5);
+
+        assert!(approx_equal_iter(
+            niggli_s.lattice.iter(),
+            Matrix3::new(-3.748244, 1.874122, 0.0, 0.0, 4.750729, -1.556253, 0.0, 0.0, -6.257948)
+                .iter(),
+            &ZERO_TOL
+        ));
     }
 }
