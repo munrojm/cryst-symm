@@ -8,11 +8,17 @@ use nalgebra::Vector3;
 use nalgebra::{try_invert_to, Matrix3};
 
 #[derive(Debug)]
+/// Represenation of a space group and its operations.
 pub struct SpaceGroup {
     pub operations: Vec<SymmOp>,
 }
 
 impl SpaceGroup {
+    /// Constructs a space group from a list of generators.
+    ///
+    /// # Arguments
+    ///
+    /// * `generators` - List of generator symmetry operations
     pub fn from_generators(generators: &[SymmOp], frac_tols: &Vector3<f64>) -> Self {
         let symm_ops = Self::ops_from_generators(generators, frac_tols);
 
@@ -22,6 +28,13 @@ impl SpaceGroup {
     }
 
     /// Transform symmetry operations `{R|t} -> {R'|t'}` according to `T^-1 R T = R'` and `T^-1 t = t'`.
+    ///
+    /// If a transformation results in a larger periodic cell, new operations will be searched for and added.
+    ///
+    /// # Arguments
+    ///
+    /// * `transformation_matrix` - Transformation matrix `T`
+    /// * `frac_tols` - List of fractional tolerance values to use for each translation component comparison.
     pub fn apply_transformation(
         &mut self,
         transformation_matrix: &Matrix3<f64>,
@@ -141,5 +154,162 @@ impl SpaceGroup {
             new_ops = generated;
         }
         symm_ops
+    }
+}
+
+#[cfg(test)]
+
+mod tests {
+    use super::*;
+    use crate::{symmop::SymmOp, utils::approx_equal_iter};
+    use nalgebra::Matrix3;
+
+    #[test]
+    fn test_from_generators() {
+        let gen_rotations: [Matrix3<i8>; 3] = [
+            Matrix3::identity(),
+            Matrix3::new(1, 0, 0, 0, -1, 0, 0, 0, 1),
+            Matrix3::identity(),
+        ];
+
+        let gen_translations: [Vector3<f64>; 3] = [
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 0.5),
+            Vector3::new(0.5, 0.5, 0.0),
+        ];
+
+        let generators: Vec<SymmOp> = gen_rotations
+            .iter()
+            .zip(gen_translations)
+            .map(|(r, t)| SymmOp {
+                rotation: *r,
+                translation: t,
+            })
+            .collect();
+
+        let frac_tols = Vector3::new(1e-3, 1e-3, 1e-3);
+
+        let sg = SpaceGroup::from_generators(&generators, &frac_tols);
+
+        let correct_ops = [
+            SymmOp {
+                rotation: Matrix3::identity(),
+                translation: Vector3::new(0.0, 0.0, 0.0),
+            },
+            SymmOp {
+                rotation: Matrix3::identity(),
+                translation: Vector3::new(0.5, 0.5, 0.0),
+            },
+            SymmOp {
+                rotation: Matrix3::new(1, 0, 0, 0, -1, 0, 0, 0, 1),
+                translation: Vector3::new(0.0, 0.0, 0.5),
+            },
+            SymmOp {
+                rotation: Matrix3::new(1, 0, 0, 0, -1, 0, 0, 0, 1),
+                translation: Vector3::new(0.5, 0.5, 0.5),
+            },
+        ];
+
+        for op in correct_ops {
+            let mut found = false;
+
+            for sg_op in sg.operations.iter() {
+                if sg_op.rotation == op.rotation
+                    && approx_equal_iter(sg_op.translation.iter(), op.translation.iter(), &ZERO_TOL)
+                {
+                    found = true;
+                }
+            }
+
+            assert!(found);
+        }
+    }
+
+    #[test]
+    fn test_apply_transformation() {
+        let gen_rotations: [Matrix3<i8>; 3] = [
+            Matrix3::identity(),
+            Matrix3::new(1, 0, 0, 0, -1, 0, 0, 0, 1),
+            Matrix3::identity(),
+        ];
+
+        let gen_translations: [Vector3<f64>; 3] = [
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 0.5),
+            Vector3::new(0.5, 0.5, 0.0),
+        ];
+
+        let generators: Vec<SymmOp> = gen_rotations
+            .iter()
+            .zip(gen_translations)
+            .map(|(r, t)| SymmOp {
+                rotation: *r,
+                translation: t,
+            })
+            .collect();
+
+        let frac_tols = Vector3::new(1e-3, 1e-3, 1e-3);
+
+        let mut sg = SpaceGroup::from_generators(&generators, &frac_tols);
+
+        let transformation_matrix: Matrix3<f64> =
+            Matrix3::new(2.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+
+        sg.apply_transformation(&transformation_matrix, &frac_tols);
+
+        let correct_transformed = [
+            SymmOp {
+                rotation: Matrix3::identity(),
+                translation: Vector3::new(0.0, 0.0, 0.0),
+            },
+            SymmOp {
+                rotation: Matrix3::identity(),
+                translation: Vector3::new(0.25, 0.5, 0.0),
+            },
+            SymmOp {
+                rotation: Matrix3::identity(),
+                translation: Vector3::new(0.5, 0.0, 0.0),
+            },
+            SymmOp {
+                rotation: Matrix3::identity(),
+                translation: Vector3::new(0.75, 0.5, 0.0),
+            },
+            SymmOp {
+                rotation: Matrix3::new(1, 0, 0, 0, -1, 0, 0, 0, 1),
+                translation: Vector3::new(0.0, 0.0, 0.5),
+            },
+            SymmOp {
+                rotation: Matrix3::new(1, 0, 0, 0, -1, 0, 0, 0, 1),
+                translation: Vector3::new(0.75, 0.5, 0.5),
+            },
+            SymmOp {
+                rotation: Matrix3::new(1, 0, 0, 0, -1, 0, 0, 0, 1),
+                translation: Vector3::new(0.5, 0.0, 0.5),
+            },
+            SymmOp {
+                rotation: Matrix3::new(1, 0, 0, 0, -1, 0, 0, 0, 1),
+                translation: Vector3::new(0.75, 0.5, 0.5),
+            },
+        ];
+
+        for symm_op in correct_transformed {
+            let mut found = false;
+            println!("{:?}", symm_op);
+
+            for sg_op in sg.operations.iter() {
+                if sg_op.rotation == symm_op.rotation
+                    && approx_equal_iter(
+                        sg_op.translation.iter(),
+                        symm_op.translation.iter(),
+                        &ZERO_TOL,
+                    )
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            assert!(found);
+        }
     }
 }
