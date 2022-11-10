@@ -9,7 +9,7 @@ use std::iter::FromIterator;
 use std::string::String;
 
 #[derive(Debug, Clone)]
-///Representation of a periodic unit cell of a crystal structure.
+/// Representation of a periodic unit cell of a crystal structure.
 pub struct Structure {
     pub lattice: Matrix3<f64>,
     pub species: Vec<String>,
@@ -22,7 +22,7 @@ impl Structure {
     ///
     /// # Arguments
     ///
-    /// * `lattice` - A 3x3 matrix with columns containing the lattice vectors.
+    /// * `lattice` - A 3x3 matrix with columns representing the lattice vectors.
     /// * `species` - A list of strings representing the elements at each atomic site.
     /// * `coords` - A list of cartesian (Å) or fractional vector coordinates of the atomic sites.
     /// * `coords_are_cart` - Whether the input coordinates are in a cartesian basis.
@@ -79,6 +79,7 @@ impl Structure {
     pub fn num_sites(&self) -> usize {
         self.species.len()
     }
+
     /// Length of cell vector `a` in angstroms
     pub fn a(&self) -> f64 {
         return self.lattice.column(0).magnitude();
@@ -122,6 +123,7 @@ impl Structure {
     pub fn volume(&self) -> f64 {
         self.lattice.determinant()
     }
+
     /// Metric tensor of lattice matrix
     pub fn metric_tensor(&self) -> Matrix3<f64> {
         self.lattice.transpose() * self.lattice
@@ -129,8 +131,14 @@ impl Structure {
 
     /// Applied a transformation to the structure as: `lattice * trans_mat = lattice'`
     ///
-    /// If the transformation results in a volume increase, then new atomic sites are searched for and added to the transformed cell.
-    pub fn apply_transformation(&mut self, trans_mat: &Matrix3<f64>, pos_tol: &f64) {
+    /// If the transformation results in a volume increase, then new atomic sites are searched
+    /// for and added to the transformed cell.
+    ///
+    /// # Arguments
+    ///
+    /// * `transformation_matrix` - A 3x3 matrix representing the transformation.
+    /// * `pos_tol` - Position tolerance in angstroms to use when comparing atomic sites.
+    pub fn apply_transformation(&mut self, transformation_matrix: &Matrix3<f64>, pos_tol: &f64) {
         let frac_tols = Vector3::from_iterator(
             self.lattice
                 .column_iter()
@@ -139,18 +147,18 @@ impl Structure {
 
         let mut inv_trans_mat: Matrix3<f64> = Matrix3::identity();
 
-        let inverted = try_invert_to(*trans_mat, &mut inv_trans_mat);
+        let inverted = try_invert_to(*transformation_matrix, &mut inv_trans_mat);
 
         if !inverted {
             panic!("Transformation matrix is not invertible!");
         }
 
-        let new_lattice = self.lattice * trans_mat;
+        let new_lattice = self.lattice * transformation_matrix;
 
         let mut new_frac_coords: Vec<Vector3<f64>> = Vec::new();
         let mut new_species: Vec<String> = Vec::new();
 
-        let volume_ratio = (trans_mat.determinant().abs() * 100.0).round() / 100.0;
+        let volume_ratio = (transformation_matrix.determinant().abs() * 100.0).round() / 100.0;
 
         // Search for new sites in transformed cell using volume ratio to determine proper number of sites
         let mut mult = 2;
@@ -211,6 +219,10 @@ impl Structure {
     }
 
     /// Normalizes fractional atomic positions to ensure all sites are within the unit cell.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos_tol` - Position tolerance in angstroms to use when comparing atomic sites.
     pub fn normalize_coords(&mut self, pos_tol: &f64) {
         let frac_tols = Vector3::from_iterator(
             self.lattice
@@ -241,28 +253,47 @@ impl Structure {
         self.frac_coords = new_frac_coords;
     }
 
-    pub fn get_cart_coords(lattice: &Matrix3<f64>, coords: &[Vector3<f64>]) -> Vec<Vector3<f64>> {
-        let mut new_coords = coords.to_owned();
+    /// Compute coordinates in a cartesian basis from the provided lattice and fractional coordinate list.
+    ///
+    /// # Arguments
+    ///
+    /// * `lattice` - A 3x3 matrix with columns representing the lattice vectors.
+    /// * `frac_coords` - A list of fractional vector coordinates of the atomic sites.
+    pub fn get_cart_coords(
+        lattice: &Matrix3<f64>,
+        frac_coords: &[Vector3<f64>],
+    ) -> Vec<Vector3<f64>> {
+        let mut new_coords = frac_coords.to_owned();
 
-        for (i, coord) in coords.iter().enumerate() {
+        for (i, coord) in frac_coords.iter().enumerate() {
             new_coords[i] = lattice * coord;
         }
         new_coords
     }
 
-    pub fn get_frac_coords(lattice: &Matrix3<f64>, coords: &[Vector3<f64>]) -> Vec<Vector3<f64>> {
+    /// Compute coordinates in a fractional basis from the provided lattice and cartesian coordinate list.
+    ///
+    /// # Arguments
+    ///
+    /// * `lattice` - A 3x3 matrix with columns representing the lattice vectors.
+    /// * `cart_coords` - A list of cartesian (Å) vector coordinates of the atomic sites.
+    pub fn get_frac_coords(
+        lattice: &Matrix3<f64>,
+        cart_coords: &[Vector3<f64>],
+    ) -> Vec<Vector3<f64>> {
         let inverted_lattice = (*lattice)
             .pseudo_inverse(ZERO_TOL)
             .expect("Crystal lattice is not invertible!");
 
-        let mut new_coords = coords.to_owned();
+        let mut new_coords = cart_coords.to_owned();
 
-        for (i, coord) in coords.iter().enumerate() {
+        for (i, coord) in cart_coords.iter().enumerate() {
             new_coords[i] = inverted_lattice * coord;
         }
         new_coords
     }
 
+    /// Reciprocal lattice of the structure
     pub fn reciprocal_lattice(&self) -> Matrix3<f64> {
         let mut reciprocal_lattice = Matrix3::identity();
         let inverted = try_invert_to(self.lattice, &mut reciprocal_lattice);
@@ -274,7 +305,7 @@ impl Structure {
         reciprocal_lattice.transpose() * 2.0 * PI
     }
 
-    /// Get the element with the smallest amount of sites, alongside an element-site index and element-count maps.
+    /// Get the element with the smallest amount of sites, alongside element-site index and element-count maps.
     pub fn get_min_element(&self) -> (String, HashMap<String, u16>, HashMap<String, u16>) {
         let mut type_count: HashMap<String, u16> = HashMap::new();
         let mut ele_inds: HashMap<String, u16> = HashMap::new();
@@ -300,6 +331,7 @@ impl Structure {
         (min_ele.clone(), ele_inds, type_count)
     }
 
+    /// Formula and reduced formula of the structure.
     pub fn formulas(&self) -> (String, String) {
         let mut species_tally = HashMap::<&String, i8>::new();
 
@@ -346,7 +378,11 @@ impl Structure {
     }
 
     /// Attempts to get the matrix that transforms this structure into the one provided.
-    pub fn get_transformation_matrix(&self, structure: &Self) -> Matrix3<f64> {
+    ///
+    /// # Arguments
+    ///
+    /// * `structure` - A transformed structure
+    pub fn get_transformation_matrix(&self, structure: &Structure) -> Matrix3<f64> {
         let inv_lattice: Matrix3<f64> = self
             .lattice
             .pseudo_inverse(ZERO_TOL)
