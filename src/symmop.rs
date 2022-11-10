@@ -3,12 +3,20 @@ use nalgebra::{Matrix3, Vector3};
 use std::ops::Mul;
 
 #[derive(Debug, Clone)]
+/// A symmetry operation with a rotation and translation component in a fractional basis.
+
 pub struct SymmOp {
     pub rotation: Matrix3<i8>,
     pub translation: Vector3<f64>,
 }
 
 impl SymmOp {
+    /// Check if the symmetry operation is equal to another within some tolerance.
+    ///
+    /// # Arguments
+    ///
+    /// * `op` - Symmetry operation to compare to.
+    /// * `frac_tols` - List of fractional tolerance values to compare each translation component with.
     pub fn is_approx_eq(&self, op: &Self, frac_tols: &Vector3<f64>) -> bool {
         let mut diff = vec![self.translation - op.translation];
         normalize_frac_vectors(&mut diff, frac_tols);
@@ -21,6 +29,11 @@ impl SymmOp {
         (self.rotation == op.rotation) && translation_eq
     }
 
+    /// Normalize the fractional components of the translation component such that all lie within `(-tol, 1+tol)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `frac_tols` - List of fractional tolerance values to use for each vector component.
     pub fn normalize(&mut self, frac_tols: &Vector3<f64>) {
         let mut new_translation = vec![self.translation];
         normalize_frac_vectors(&mut new_translation, frac_tols);
@@ -32,6 +45,7 @@ impl SymmOp {
 impl Mul for SymmOp {
     type Output = Self;
 
+    /// Implements multiplication between symmetry operations according to `S1 * S2 = { R1*R2 | (R1*t1)+t2 }`.
     fn mul(self, rhs: Self) -> Self {
         let new_rotation = self.rotation * rhs.rotation;
 
@@ -49,6 +63,7 @@ impl Mul for SymmOp {
 impl Mul<Vector3<f64>> for SymmOp {
     type Output = Vector3<f64>;
 
+    /// Implements multiplication between symmetry operations and `nalgebra::Vector3`.
     fn mul(self, rhs: Vector3<f64>) -> Vector3<f64> {
         let float_rotation: Matrix3<f64> = self.rotation.cast::<f64>();
 
