@@ -39,7 +39,7 @@ impl Reducer {
         let (min_ele, ele_inds, _) = temp_structure.get_min_element();
 
         //
-        // 2.) Shift origin to first atom of min_ele type and normalize coords
+        // 2.) Shift origin to first atom of min_ele type and normalize coords (deprecated)
         //
 
         //let new_origin = temp_structure.frac_coords[*ele_inds.get(&min_ele).unwrap() as usize];

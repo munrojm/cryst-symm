@@ -1,5 +1,6 @@
 use crate::data::core::ZERO_TOL;
 use crate::utils::normalize_frac_vectors;
+use itertools::Itertools;
 use itertools::{iproduct, izip};
 use nalgebra::{try_invert_to, Matrix3, Matrix3x4, Vector3};
 use std::collections::HashMap;
@@ -29,6 +30,7 @@ impl Structure {
     /// # Examples
     ///
     /// ```
+    /// # use crystsymm::structure::Structure;
     /// use nalgebra::{Matrix3, Vector3};
     ///
     /// let a = Vector3::new(-3.748244, 0.0, 0.0);
@@ -94,24 +96,24 @@ impl Structure {
 
     /// Angle `alpha` in degrees
     pub fn alpha(&self) -> f64 {
-        return ((self.lattice.column(0).dot(&self.lattice.column(1)))
-            / (self.a().abs() * self.b().abs()))
-        .acos()
-            * (180.0 / PI);
-    }
-
-    /// Angle `beta` in degrees
-    pub fn beta(&self) -> f64 {
         return ((self.lattice.column(1).dot(&self.lattice.column(2)))
             / (self.b().abs() * self.c().abs()))
         .acos()
             * (180.0 / PI);
     }
 
-    /// Angle `gamma` in degrees
-    pub fn gamma(&self) -> f64 {
+    /// Angle `beta` in degrees
+    pub fn beta(&self) -> f64 {
         return ((self.lattice.column(0).dot(&self.lattice.column(2)))
             / (self.a().abs() * self.c().abs()))
+        .acos()
+            * (180.0 / PI);
+    }
+
+    /// Angle `gamma` in degrees
+    pub fn gamma(&self) -> f64 {
+        return ((self.lattice.column(0).dot(&self.lattice.column(1)))
+            / (self.a().abs() * self.b().abs()))
         .acos()
             * (180.0 / PI);
     }
@@ -208,14 +210,6 @@ impl Structure {
         Matrix3x4::from_columns(&cols)
     }
 
-    /// Sets a new origin point for the unit cell.
-    pub fn set_origin(&mut self, fractional_vector: Vector3<f64>) {
-        for vec in self.frac_coords.iter_mut() {
-            *vec -= fractional_vector;
-        }
-        self.coords = Self::get_cart_coords(&self.lattice, &self.frac_coords);
-    }
-
     /// Normalizes fractional atomic positions to ensure all sites are within the unit cell.
     pub fn normalize_coords(&mut self, pos_tol: &f64) {
         let frac_tols = Vector3::from_iterator(
@@ -280,7 +274,7 @@ impl Structure {
         reciprocal_lattice.transpose() * 2.0 * PI
     }
 
-    /// Get the element with the smallest amount of sites, alongside an element-site-number map.
+    /// Get the element with the smallest amount of sites, alongside an element-site index and element-count maps.
     pub fn get_min_element(&self) -> (String, HashMap<String, u16>, HashMap<String, u16>) {
         let mut type_count: HashMap<String, u16> = HashMap::new();
         let mut ele_inds: HashMap<String, u16> = HashMap::new();
@@ -330,20 +324,24 @@ impl Structure {
         let mut formula = String::new();
         let mut reduced_formula = String::new();
 
-        for (element, count) in species_tally.into_iter() {
-            formula.push_str(element);
-            reduced_formula.push_str(element);
+        species_tally
+            .into_iter()
+            .sorted()
+            .for_each(|(element, count)| {
+                formula.push_str(element);
+                reduced_formula.push_str(element);
 
-            if count != 1 {
-                formula.push_str(&count.to_string());
-            }
+                if count != 1 {
+                    formula.push_str(&count.to_string());
+                }
 
-            let new_count = count / gcf;
+                let new_count = count / gcf;
 
-            if new_count != 1 {
-                reduced_formula.push_str(&new_count.to_string());
-            }
-        }
+                if new_count != 1 {
+                    reduced_formula.push_str(&new_count.to_string());
+                }
+            });
+
         (formula, reduced_formula)
     }
 
@@ -355,5 +353,276 @@ impl Structure {
             .expect("Crystal lattice is not invertible!");
 
         inv_lattice * structure.lattice
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils::approx_equal_iter;
+
+    fn generate_structure() -> Structure {
+        let a = Vector3::new(-3.748244, 0.0, 0.0);
+        let b = Vector3::new(1.874122, -4.750729, 0.0);
+        let c = Vector3::new(0.0, 1.5562529, 6.25794799);
+
+        let lattice = Matrix3::from_columns(&[a, b, c]);
+
+        let elements = ["Au", "Au", "Se", "Se"];
+        let species: Vec<String> = elements.iter().map(|s| s.to_string()).collect();
+        let coords = vec![
+            Vector3::new(-1.8741, 0.7781, 3.1290),
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(-1.8741, -3.0213, 1.7273),
+            Vector3::new(0.0, -0.1732, 4.5307),
+        ];
+
+        Structure::new(lattice, species, coords, true)
+    }
+
+    #[test]
+    fn test_scalar_attributes() {
+        let s = generate_structure();
+
+        let real_scalars = [
+            4.0,
+            3.748244,
+            5.107030380008033,
+            6.44855306023863,
+            102.97327735350085,
+            90.0,
+            111.52881069906073,
+            111.43460086012757,
+        ];
+        let test_scalars = [
+            s.num_sites() as f64,
+            s.a(),
+            s.b(),
+            s.c(),
+            s.alpha(),
+            s.beta(),
+            s.gamma(),
+            s.volume(),
+        ];
+
+        assert!(approx_equal_iter(
+            real_scalars.into_iter(),
+            test_scalars.into_iter(),
+            &ZERO_TOL
+        ));
+    }
+
+    #[test]
+    fn test_formulas() {
+        let mut s = generate_structure();
+        let (formula, reduced_formula) = s.formulas();
+        assert_eq!(formula, "Au2Se2".to_string());
+        assert_eq!(reduced_formula, "AuSe".to_string());
+
+        let elements = [
+            "Si", "Si", "Si", "Si", "Si", "Si", "O", "O", "P", "P", "P", "P",
+        ];
+        s.species = elements.iter().map(|s| s.to_string()).collect();
+
+        let (formula, reduced_formula) = s.formulas();
+        assert_eq!(formula, "O2P4Si6".to_string());
+        assert_eq!(reduced_formula, "OP2Si3".to_string());
+    }
+
+    #[test]
+    fn test_min_element() {
+        let s = generate_structure();
+
+        let ele_map = HashMap::from([("Au".to_string(), 2), ("Se".to_string(), 2)]);
+        let ind_map = HashMap::from([("Au".to_string(), 0), ("Se".to_string(), 2)]);
+
+        let (min_ele, ele_inds, type_count) = s.get_min_element();
+
+        assert_eq!(min_ele, "Au");
+        assert_eq!(type_count, ele_map);
+        assert_eq!(ele_inds, ind_map);
+    }
+
+    #[test]
+    fn test_metric_tensor() {
+        let s = generate_structure();
+
+        assert!(approx_equal_iter(
+            s.metric_tensor().into_iter().copied(),
+            Matrix3::new(
+                14.04933308,
+                -7.02466654,
+                0.0,
+                -7.02466654,
+                26.0817593,
+                -7.39333626,
+                0.0,
+                -7.39333626,
+                41.58383657
+            )
+            .into_iter()
+            .copied(),
+            &ZERO_TOL
+        ));
+    }
+
+    #[test]
+    fn test_reciprocal_lattice() {
+        let s = generate_structure();
+
+        assert!(approx_equal_iter(
+            s.reciprocal_lattice().into_iter().copied(),
+            Matrix3::new(
+                -1.67630104,
+                -0.66128644,
+                0.16445151,
+                0.0,
+                -1.32257287,
+                0.32890302,
+                0.0,
+                0.0,
+                1.00403284
+            )
+            .transpose()
+            .into_iter()
+            .copied(),
+            &ZERO_TOL
+        ));
+    }
+
+    #[test]
+    fn test_delaunay() {
+        let s = generate_structure();
+
+        assert!(approx_equal_iter(
+            s.delaunay_matrix().into_iter().copied(),
+            Matrix3x4::new(
+                -3.748244,
+                1.874122,
+                0.0,
+                1.874122,
+                0.0,
+                -4.750729,
+                1.5562529,
+                3.1944760999999997,
+                0.0,
+                0.0,
+                6.25794799,
+                -6.25794799
+            )
+            .into_iter()
+            .copied(),
+            &ZERO_TOL
+        ));
+    }
+
+    #[test]
+    fn test_get_cart_coords() {
+        let s = generate_structure();
+
+        let cart_coords = Structure::get_cart_coords(&s.lattice, &s.frac_coords);
+
+        let test_coords: Vec<Vector3<f64>> = vec![
+            Vector3::new(-1.8741, 0.7781, 3.1290),
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(-1.8741, -3.0213, 1.7273),
+            Vector3::new(0.0, -0.1732, 4.5307),
+        ];
+
+        for (real, test) in cart_coords.into_iter().zip(test_coords) {
+            assert!(approx_equal_iter(
+                real.iter().copied(),
+                test.iter().copied(),
+                &1e-4
+            ));
+        }
+    }
+
+    #[test]
+    fn test_get_frac_coords() {
+        let s = generate_structure();
+
+        let frac_coords = Structure::get_frac_coords(&s.lattice, &s.coords);
+
+        let test_coords: Vec<Vector3<f64>> = vec![
+            Vector3::new(0.4999, 0.0000, 0.5),
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.863192, 0.726384, 0.276014),
+            Vector3::new(0.136808, 0.273616, 0.723986),
+        ];
+
+        for (real, test) in frac_coords.into_iter().zip(test_coords) {
+            assert!(approx_equal_iter(
+                real.iter().copied(),
+                test.iter().copied(),
+                &1e-4
+            ));
+        }
+    }
+
+    #[test]
+    fn test_normalize_coords() {
+        let mut s = generate_structure();
+
+        let test_coords = vec![
+            Vector3::new(1.05, 2.6, 1.5),
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(-0.75, 0.5, 0.5),
+            Vector3::new(-1.05, -2.61, -1.5),
+        ];
+
+        let real_coords = vec![
+            Vector3::new(0.05, 0.6, 0.5),
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.25, 0.5, 0.5),
+            Vector3::new(0.95, 0.39, 0.5),
+        ];
+
+        s.frac_coords = test_coords;
+
+        s.normalize_coords(&0.1);
+
+        for (real, test) in s.frac_coords.into_iter().zip(real_coords) {
+            assert!(approx_equal_iter(
+                real.iter().copied(),
+                test.iter().copied(),
+                &1e-4
+            ));
+        }
+    }
+
+    #[test]
+    fn test_apply_transformation() {
+        let mut s = generate_structure();
+        println!("{:?}", s.lattice);
+        let trans_mat = Matrix3::new(2.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+
+        s.apply_transformation(&trans_mat, &0.01);
+
+        assert!(approx_equal_iter(
+            s.lattice.into_iter().copied(),
+            Matrix3::new(-7.496488, -1.874122, 0.0, 0.0, -4.750729, 1.556253, 0.0, 0.0, 6.257948)
+                .into_iter()
+                .copied(),
+            &ZERO_TOL
+        ));
+    }
+
+    #[test]
+    fn test_get_transformation_matrix() {
+        let s = generate_structure();
+        let mut trans_s = s.clone();
+
+        let trans_mat = Matrix3::new(2.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+
+        trans_s.apply_transformation(&trans_mat, &0.1);
+
+        let recovered_mat = s.get_transformation_matrix(&trans_s);
+
+        assert!(approx_equal_iter(
+            recovered_mat.into_iter().copied(),
+            trans_mat.into_iter().copied(),
+            &ZERO_TOL
+        ));
     }
 }

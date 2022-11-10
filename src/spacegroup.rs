@@ -27,6 +27,7 @@ impl SpaceGroup {
         transformation_matrix: &Matrix3<f64>,
         frac_tols: &Vector3<f64>,
     ) {
+        //TODO: Use operations to smartly choose which translation vectors to use
         let mut inv_trans_mat: Matrix3<f64> = Matrix3::identity();
         let inverted = try_invert_to(*transformation_matrix, &mut inv_trans_mat);
 

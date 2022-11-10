@@ -76,3 +76,22 @@ pub fn compare_matrices(a: &Matrix3<f64>, b: &Matrix3<f64>, tols: &[f64]) -> boo
 
     true
 }
+
+/// Function to compare two float values within some tolerance
+pub fn approx_equal(a: &f64, b: &f64, tol: &f64) -> bool {
+    (a - b).abs() < *tol
+}
+
+pub fn approx_equal_iter(
+    a: impl ExactSizeIterator<Item = f64>,
+    b: impl ExactSizeIterator<Item = f64>,
+    tol: &f64,
+) -> bool {
+    let a = a.into_iter();
+    let b = b.into_iter();
+
+    if a.len() != b.len() {
+        panic!("Iterators provided for comparison do not have equal lengths")
+    }
+    a.zip(b).all(|(a_i, b_i)| approx_equal(&a_i, &b_i, tol))
+}
