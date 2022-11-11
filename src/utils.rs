@@ -1,5 +1,4 @@
 use nalgebra::{Matrix3, Vector3};
-use std::f64::consts::PI;
 
 ///Normalizes fraction vectors components such that they are within `(-frac_tol, 1-frac_tol)`
 pub fn normalize_frac_vectors(vecs: &mut Vec<Vector3<f64>>, frac_tols: &Vector3<f64>) {
@@ -13,24 +12,6 @@ pub fn normalize_frac_vectors(vecs: &mut Vec<Vector3<f64>>, frac_tols: &Vector3<
             };
         }
     }
-}
-
-///Calculate the uncertainty in the dot product of two vectors.
-pub fn calculate_dot_uncertainty(
-    v1: &Vector3<f64>,
-    v2: &Vector3<f64>,
-    dv1: &f64,
-    dv2: &f64,
-    dtheta: &f64,
-) -> f64 {
-    let v1_norm = v1.magnitude();
-    let v2_norm = v2.magnitude();
-    let theta = (v1.dot(v2) / (v1_norm * v2_norm)).acos();
-
-    ((v2_norm * theta.cos() * dv1).powf(2.0)
-        + (v1_norm * theta.cos() * dv2).powf(2.0)
-        + (v1_norm * v2_norm * theta.sin() * dtheta * (PI / 180.0)).powf(2.0))
-    .sqrt()
 }
 
 ///Count the number of negative or zero components in a vector within a tolerance `epsilon`
@@ -90,4 +71,76 @@ pub fn approx_equal_iter<'a, T: ExactSizeIterator<Item = &'a f64>>(a: T, b: T, t
         panic!("Iterators provided for comparison do not have equal lengths")
     }
     a.zip(b).all(|(a_i, b_i)| approx_equal(&a_i, &b_i, tol))
+}
+
+#[cfg(test)]
+
+mod tests {
+
+    use super::*;
+    use nalgebra::{Matrix3, Vector3};
+
+    #[test]
+    fn test_approx_equal() {
+        let base = [0.1, 0.2, 0.3];
+        let good = [0.10001, 0.20001, 0.30001];
+        let bad = [0.11, 0.21, 0.31];
+
+        assert!(!approx_equal_iter(base.iter(), bad.iter(), &1e-3));
+        assert!(approx_equal_iter(base.iter(), good.iter(), &1e-3));
+    }
+
+    #[test]
+    fn test_num_negative() {
+        let vec = vec![0.1, 0.2, 0.3, 1e-7, -0.1];
+
+        let num = num_negative_zero(&vec, &1e-6);
+
+        assert_eq!(num, (1, 1));
+    }
+
+    #[test]
+    fn test_decode() {
+        let num = 3360;
+        let mat: Vec<i8> = vec![-1, 0, 0, 0, 1, 0, 0, 0, -1];
+
+        let decode_mat = decode(num, 3, 1, 9);
+
+        assert_eq!(mat, decode_mat);
+    }
+
+    #[test]
+    fn test_custom_compare() {
+        let mat1: Matrix3<f64> = Matrix3::new(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0);
+        let mat2: Matrix3<f64> =
+            Matrix3::new(1.00001, 0.0, 1e-6, 0.0, -1.000001, 0.0, 0.0, 0.0, 1.0);
+        let mat3: Matrix3<f64> = Matrix3::new(1.01, 0.0, 0.0, 0.0, -1.01, 0.0, 0.0, 0.0, 1.01);
+
+        let tols: [f64; 9] = [
+            0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,
+        ];
+
+        assert!(!compare_matrices(&mat1, &mat3, &tols));
+        assert!(compare_matrices(&mat1, &mat2, &tols));
+    }
+    #[test]
+    fn test_normalize() {
+        let mut vecs: Vec<Vector3<f64>> = vec![
+            Vector3::new(-1.25, 1.000001, 1.47),
+            Vector3::new(-1e-5, 0.47, -0.78),
+        ];
+        let frac_tols: Vector3<f64> = Vector3::new(1e-3, 1e-3, 1e-3);
+        normalize_frac_vectors(&mut vecs, &frac_tols);
+
+        assert!(approx_equal_iter(
+            vecs[0].iter(),
+            Vector3::new(0.75, 1.000001, 0.47).iter(),
+            &1e-3
+        ));
+        assert!(approx_equal_iter(
+            vecs[1].iter(),
+            Vector3::new(-1e-5, 0.47, 0.22).iter(),
+            &1e-3
+        ));
+    }
 }
