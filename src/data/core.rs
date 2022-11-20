@@ -50,6 +50,7 @@ impl FromStr for Centering {
     }
 }
 
+#[derive(PartialEq, Debug, Eq, Hash)]
 pub enum LatticeSystem {
     Triclinic,
     Monoclinic,
