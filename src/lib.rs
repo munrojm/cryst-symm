@@ -90,19 +90,19 @@ fn niggli_reduce(
 }
 
 #[pyfunction]
-fn get_space_group_operations(
+fn get_space_group_info(
     lattice: Vec<f64>,
     species: Vec<String>,
     coords: Vec<Vec<f64>>,
     coords_are_cart: bool,
     dtol: f64,
     atol: f64,
-) -> PyResult<Vec<(Vec<i8>, Vec<f64>)>> {
+) -> PyResult<(u8, String, Vec<(Vec<i8>, Vec<f64>)>)> {
     let structure = generate_input_structure(lattice, species, coords, coords_are_cart);
 
     let sa = SymmetryAnalyzer { dtol, atol };
 
-    let space_group = sa.get_space_group_operations(&structure);
+    let (space_group_num, space_group_symbol, space_group) = sa.get_space_group_info(&structure);
 
     let mut op_list: Vec<(Vec<i8>, Vec<f64>)> = Vec::new();
     for symm_op in space_group.operations.iter() {
@@ -111,7 +111,7 @@ fn get_space_group_operations(
         op_list.push((mat_list, vec_list));
     }
 
-    Ok(op_list)
+    Ok((space_group_num, space_group_symbol, op_list))
 }
 
 #[pyfunction]
@@ -160,7 +160,7 @@ fn crystsymm(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(niggli_reduce, m)?)?;
     m.add_function(wrap_pyfunction!(get_standard_conventional_structure, m)?)?;
     m.add_function(wrap_pyfunction!(get_standard_primitive_structure, m)?)?;
-    m.add_function(wrap_pyfunction!(get_space_group_operations, m)?)?;
+    m.add_function(wrap_pyfunction!(get_space_group_info, m)?)?;
     m.add_function(wrap_pyfunction!(find_primitive, m)?)?;
 
     Ok(())

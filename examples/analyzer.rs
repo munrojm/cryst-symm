@@ -29,11 +29,11 @@ fn main() {
         atol: 5.0,
     };
 
-    let tmat = Matrix3::new(4.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 4.0);
+    let tmat = Matrix3::new(2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0);
 
     structure.apply_transformation(&tmat, &0.05);
 
-    let sg = sa.get_space_group_operations(&structure);
+    let sg = sa.get_space_group_info(&structure);
 
     println!("{:#?}", sg);
 }

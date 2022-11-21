@@ -36,14 +36,29 @@ pub fn cust_eq(a: &f64, b: &f64, epsilon: &f64) -> bool {
 
 /// Decode a vector of integers which is encoded in a particular base.
 /// Outputs data into the vector passed to `out`.
-pub fn decode(e: u16, base: u8, sub: i8, len: i8) -> Vec<i8> {
+pub fn decode(e: u32, base: u8, sub: i8, len: i8) -> Vec<i8> {
     let mut out: Vec<i8> = Vec::new();
     let mut new_e = e;
     for _ in 0..len {
-        out.insert(0, (new_e % base as u16) as i8 - sub);
-        new_e /= base as u16
+        out.insert(0, (new_e % base as u32) as i8 - sub);
+        new_e /= base as u32
     }
     out
+}
+
+pub fn decode_spg_op(num: u32) -> (Vec<i8>, Vec<i8>) {
+    let base8_translation_map = [0, 2, 3, 4, 6, 8, 9, 10];
+
+    let num_rot = num % (3_u32.pow(9));
+    let num_trans = num / (3_u32.pow(9));
+
+    let dec_rot = decode(num_rot, 3, 1, 9);
+    let dec_trans: Vec<i8> = decode(num_trans, 8, 0, 3)
+        .iter()
+        .map(|&i| base8_translation_map[i as usize])
+        .collect();
+
+    (dec_rot, dec_trans)
 }
 
 /// Function to compare two float rotation matrices element-wise with some tolerance

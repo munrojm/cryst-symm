@@ -48,7 +48,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     group.sampling_mode(SamplingMode::Flat);
 
     group.bench_function("spg_determination", |b| {
-        b.iter(|| sa.get_space_group_operations(black_box(&structure)))
+        b.iter(|| sa.get_space_group_info(black_box(&structure)))
     });
 
     group.bench_function("std_conv_determination", |b| {

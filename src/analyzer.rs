@@ -1,14 +1,15 @@
 use crate::data::core::{
-    BravaisType, CENTERING_TO_PRIM_TRANS, INT_CONVERSION_MULT, LATTICE_CHAR_TO_BRAVAIS,
-    LATTICE_CHAR_TO_CONV_TRANS,
+    BravaisType, LatticeSystem, CENTERING_TO_PRIM_TRANS, INT_CONVERSION_MULT,
+    LATTICE_CHAR_TO_BRAVAIS, LATTICE_CHAR_TO_CONV_TRANS,
 };
 use crate::data::pointgroup::BRAVAIS_TO_HOLOHEDRY_NUM;
+use crate::data::spacegroup::{SG_NUM_TO_FULL_MATRICES, SG_NUM_TO_SYMBOL};
 use crate::pointgroup::PointGroup;
 use crate::reduce::Reducer;
 use crate::spacegroup::SpaceGroup;
 use crate::structure::Structure;
 use crate::symmop::SymmOp;
-use crate::utils::{cust_eq, normalize_frac_vectors, num_negative_zero};
+use crate::utils::{cust_eq, decode_spg_op, normalize_frac_vectors, num_negative_zero};
 use nalgebra::{Matrix3, Vector3};
 use std::collections::HashMap;
 
@@ -19,7 +20,11 @@ pub struct SymmetryAnalyzer {
 }
 
 impl SymmetryAnalyzer {
-    pub fn get_space_group_operations(&self, structure: &Structure) -> SpaceGroup {
+    /// Obtains crystallographic space group information for an input structure including:
+    /// - International space group number
+    /// - International symbol
+    /// - Matrix-vector operations in the basis of the input structure
+    pub fn get_space_group_info(&self, structure: &Structure) -> (u8, String, SpaceGroup) {
         // Get conventional structure, classify, and get space group generators
         let reducer = Reducer {
             dtol: self.dtol,
@@ -53,6 +58,12 @@ impl SymmetryAnalyzer {
         );
 
         let mut sg = SpaceGroup::from_generators(&sg_generators, &frac_tols);
+        let (int_num, sg_symbol) = SymmetryAnalyzer::identify_space_group(
+            &sg,
+            &bravais_symbol.lattice_system(),
+            &frac_tols,
+        )
+        .expect("Cannot identify spacegroup from operations!");
 
         // Put operations back into the basis of the input structure
         let initial_trans_mat = prim_structure.get_transformation_matrix(structure);
@@ -70,7 +81,67 @@ impl SymmetryAnalyzer {
 
         sg.apply_transformation(&total_transformation, &frac_tols);
 
-        sg
+        (int_num, sg_symbol, sg)
+    }
+
+    fn identify_space_group(
+        sg: &SpaceGroup,
+        lattice_system: &LatticeSystem,
+        frac_tols: &Vector3<f64>,
+    ) -> Option<(u8, String)> {
+        let order = sg.operations.len() as u8;
+
+        let lattice_groups = SG_NUM_TO_FULL_MATRICES
+            .get(&lattice_system)
+            .expect("Cannot find candidate groups with the provided lattice system!");
+
+        let candidate_groups = lattice_groups
+            .get(&order)
+            .expect("Could not find candidate group with the provided number of operations!");
+
+        let mut output_data: Option<(u8, String)> = Option::None;
+
+        for (num, encoded_ops) in candidate_groups.iter() {
+            let mut all_found = true;
+
+            for sg_op in sg.operations.iter() {
+                let mut op_found = false;
+
+                for encoded_op in encoded_ops.iter() {
+                    let (matrix_vec, trans_vec) = decode_spg_op(*encoded_op);
+                    let rotation: Matrix3<i8> = Matrix3::from_iterator(matrix_vec).transpose();
+                    let translation: Vector3<f64> =
+                        Vector3::from_iterator(trans_vec).cast::<f64>() / 12.0;
+
+                    let candidate_op = SymmOp {
+                        rotation: rotation,
+                        translation: translation,
+                    };
+
+                    if sg_op.is_approx_eq(&candidate_op, &frac_tols) {
+                        op_found = true;
+                    }
+                }
+
+                if !op_found {
+                    all_found = false;
+                    break;
+                }
+            }
+
+            if all_found {
+                output_data = Some((
+                    num.clone(),
+                    SG_NUM_TO_SYMBOL
+                        .get(num)
+                        .expect("ITA space group number provided is not valid!")
+                        .to_string(),
+                ));
+                break;
+            }
+        }
+
+        output_data
     }
 
     fn get_primitive_space_group_ops(
