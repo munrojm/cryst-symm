@@ -103,15 +103,32 @@ impl SymmetryAnalyzer {
 
         for (num, encoded_ops) in candidate_groups.iter() {
             let mut all_found = true;
+            let is_a_centered = SG_NUM_TO_SYMBOL
+                .get(num)
+                .expect("ITA space group number provided is not valid!")
+                .to_string()
+                .chars()
+                .any(|char| char == 'A');
 
             for sg_op in sg.operations.iter() {
                 let mut op_found = false;
 
                 for encoded_op in encoded_ops.iter() {
                     let (matrix_vec, trans_vec) = decode_spg_op(*encoded_op);
-                    let rotation: Matrix3<i8> = Matrix3::from_iterator(matrix_vec).transpose();
-                    let translation: Vector3<f64> =
+                    let mut rotation: Matrix3<i8> = Matrix3::from_iterator(matrix_vec).transpose();
+                    let mut translation: Vector3<f64> =
                         Vector3::from_iterator(trans_vec).cast::<f64>() / 12.0;
+
+                    if is_a_centered {
+                        let c_to_a_transformation: Matrix3<i8> =
+                            Matrix3::new(0, 0, 1, 1, 0, 0, 0, 1, 0);
+
+                        let c_to_a_transformation_inv: Matrix3<i8> =
+                            Matrix3::new(0, 1, 0, 0, 0, 1, 1, 0, 0);
+
+                        rotation = c_to_a_transformation_inv * rotation * c_to_a_transformation;
+                        translation = c_to_a_transformation_inv.cast::<f64>() * translation;
+                    }
 
                     let candidate_op = SymmOp {
                         rotation: rotation,
